@@ -5,8 +5,6 @@ import java.io.OutputStream;
 
 public interface DataContainer {
 
-    void initialize(int blockIdx, boolean justCreated);
-
     String getFullName(int blockIdx);
 
     void update(int blockIdx, InputStream stream);

@@ -3,6 +3,7 @@ package io.github.alexeygrishin.hashfile.btreebased;
 import io.github.alexeygrishin.blockalloc.Allocator;
 import io.github.alexeygrishin.blockalloc.BlockToModify;
 import io.github.alexeygrishin.btree.NoSuchElement;
+import io.github.alexeygrishin.common.LockMap;
 import io.github.alexeygrishin.common.Pointer;
 
 import java.io.IOException;
@@ -13,60 +14,48 @@ import java.nio.charset.StandardCharsets;
 public class DataStorage implements DataContainer{
 
     private Allocator allocator;
+    private LockMap<Integer> pageLocker = new LockMap<>();
 
     public DataStorage(Allocator allocator) {
         this.allocator = allocator;
     }
 
     @Override
-    public void initialize(int blockIdx, boolean justCreated) {
-        //here could be some meta-info
-    }
-
-    @Override
     public String getFullName(int blockIdx) {
-        DataPage firstBlock = getNonDeletedPage(blockIdx);
-        byte[] nameAsBytes = new byte[firstBlock.wholeNameLen];
-        int offset = 0;
-        DataPage currentBlock = firstBlock;
-        while (currentBlock.hasNamePart()) {
-            offset = currentBlock.getNamePart(nameAsBytes, offset);
-            int next = currentBlock.nextPage;
+        try (LockMap.AutoLock ignore = pageLocker.lockRead(blockIdx)) {
+            DataPage firstBlock = getNonDeletedPage(blockIdx);
+            byte[] nameAsBytes = new byte[firstBlock.wholeNameLen];
+            int offset = 0;
+            DataPage currentBlock = firstBlock;
+            while (currentBlock.hasNamePart()) {
+                offset = currentBlock.getNamePart(nameAsBytes, offset);
+                int next = currentBlock.nextPage;
 
-            if (!Pointer.isValid(next)) {
-                break;
+                if (!Pointer.isValid(next)) {
+                    break;
+                }
+                currentBlock = getNonDeletedPage(next);
             }
-            currentBlock = getNonDeletedPage(next);
+            return new String(nameAsBytes, StandardCharsets.UTF_8);
         }
-        return new String(nameAsBytes, StandardCharsets.UTF_8);
     }
 
     @Override
     public void update(int blockIdx, InputStream stream) {
-        DataPage currentBlock = getNonDeletedPage(blockIdx);
-        int next = findFirstDataBlockIdx(blockIdx, currentBlock);
-        try {
+        try (LockMap.AutoLock ignore = pageLocker.lockWrite(blockIdx)) {
+            DataPage currentBlock = getNonDeletedPage(blockIdx);
+            int next = findFirstDataBlockIdx(blockIdx, currentBlock);
             saveDataStartingFrom(stream, getNonDeletedPageToModify(next));
         } catch (IOException e) {
             throw new DataException(e);
         }
     }
 
-    private int findFirstDataBlockIdx(int blockIdx, DataPage currentBlock) {
-        int next = blockIdx;
-        while (!currentBlock.hasDataPart()) {
-            next = currentBlock.nextPage;
-            assert Pointer.isValidNext(next);
-            currentBlock = getNonDeletedPage(next);
-        }
-        return next;
-    }
-
     @Override
     public void select(int blockIdx, OutputStream stream) {
-        DataPage currentBlock = getNonDeletedPage(blockIdx);
-        int next = findFirstDataBlockIdx(blockIdx, currentBlock);
-        try {
+        try (LockMap.AutoLock ignore = pageLocker.lockRead(blockIdx)) {
+            DataPage currentBlock = getNonDeletedPage(blockIdx);
+            int next = findFirstDataBlockIdx(blockIdx, currentBlock);
             while (Pointer.isValid(next)) {
                 currentBlock = getNonDeletedPage(next);
                 currentBlock.sendData(stream);
@@ -79,23 +68,11 @@ public class DataStorage implements DataContainer{
 
     }
 
-    private DataPage getNonDeletedPage(int idx) {
-        DataPage page = allocator.get(idx, DataPage.class);
-        page.ensureNotDeleted();
-        return page;
-    }
-
-    private BlockToModify<DataPage> getNonDeletedPageToModify(int idx) {
-        BlockToModify<DataPage> page = allocator.getToModify(idx, DataPage.class);
-        page.getBlock().ensureNotDeleted();
-        return page;
-    }
-
     @Override
     public int insert(String fullName, InputStream stream) {
         byte[] nameInBytes = fullName.getBytes();
         int createdBlockId = Pointer.NULL_PTR;
-        try {
+        try {   //no need for lock here - allocator shall be thread-safe for adding
             BlockToModify<DataPage> firstBlock = allocator.allocateToModify(DataPage.class);
             firstBlock.getBlock().nextPage = Pointer.NULL_PTR;
             createdBlockId = firstBlock.getBlockId();
@@ -121,6 +98,50 @@ public class DataStorage implements DataContainer{
                 delete(createdBlockId);
             throw new DataException(e);
         }
+    }
+
+
+    @Override
+    public void delete(int blockIdx) {
+        int current = blockIdx;
+        try (LockMap.AutoLock ignore = pageLocker.lockWrite(blockIdx)) {
+            do {
+                int next;
+                //do not use getNonDeletedPageToModify here - it throws exception if page is deleted, but we may ignore it
+                try (BlockToModify<DataPage> data = allocator.getToModify(current, DataPage.class)) {
+                    data.getBlock().deleted = 1;
+                    next = data.getBlock().nextPage;
+                }
+                allocator.free(current);
+                current = next;
+            } while (Pointer.isValidNext(current));
+        }
+    }
+
+    public void close() {
+        allocator.close();
+    }
+
+    private int findFirstDataBlockIdx(int blockIdx, DataPage currentBlock) {
+        int next = blockIdx;
+        while (!currentBlock.hasDataPart()) {
+            next = currentBlock.nextPage;
+            assert Pointer.isValidNext(next);
+            currentBlock = getNonDeletedPage(next);
+        }
+        return next;
+    }
+
+    private DataPage getNonDeletedPage(int idx) {
+        DataPage page = allocator.get(idx, DataPage.class);
+        page.ensureNotDeleted();
+        return page;
+    }
+
+    private BlockToModify<DataPage> getNonDeletedPageToModify(int idx) {
+        BlockToModify<DataPage> page = allocator.getToModify(idx, DataPage.class);
+        page.getBlock().ensureNotDeleted();
+        return page;
     }
 
     private void saveDataStartingFrom(InputStream stream, BlockToModify<DataPage> current) throws IOException {
@@ -150,25 +171,6 @@ public class DataStorage implements DataContainer{
             current.getBlock().nextPage = Pointer.NULL_PTR;
         }
         current.close();
-    }
-
-    @Override
-    public void delete(int blockIdx) {
-        int current = blockIdx;
-        do {
-            int next;
-            //do not use getNonDeletedPageToModify here - it throws exception if page is deleted, but we may ignore it
-            try (BlockToModify<DataPage> data = allocator.getToModify(current, DataPage.class)) {
-                data.getBlock().deleted = 1;
-                next = data.getBlock().nextPage;
-            }
-            allocator.free(current);
-            current = next;
-        } while (Pointer.isValidNext(current));
-    }
-
-    public void close() {
-        allocator.close();
     }
 
     private enum Status {

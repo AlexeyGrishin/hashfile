@@ -7,10 +7,13 @@ import io.github.alexeygrishin.btree.blocks.Page;
 import io.github.alexeygrishin.btree.blocks.PageInfo;
 import io.github.alexeygrishin.btree.blocks.TreeEntry;
 import io.github.alexeygrishin.btree.blocks.TreeInfo;
+import io.github.alexeygrishin.common.Locker;
 import io.github.alexeygrishin.common.Pointer;
 
 import java.io.PrintStream;
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class BTree implements Iterable<String>, AutoCloseable {
@@ -22,6 +25,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
     private int t, minAmount, maxAmount;
     private long totalCount = 0;
     private int firstPageBlockIdx, metaBlockIdx;
+    private final ReadWriteLock treeLock = new ReentrantReadWriteLock();
 
     private volatile int modCount = 0;
 
@@ -90,15 +94,21 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     public long remove(String key) {
-        TreeEntry entry = findAndDelete(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
+        TreeEntry entry;
+        try (Locker ignore = writeLock()) {
+            entry = findAndDelete(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
+        }
         return entry != null ? entry.data : Pointer.NULL_PTR;
     }
 
     public int size() {           //TODO
-        return (int)totalCount;
+        try (Locker ignore = readLock()) {
+            return (int)totalCount;
+        }
     }
 
 
+    @SuppressWarnings("unused")
     public void dump(PrintStream stream) {
         stream.println("B-tree, total = " + totalCount + ", t = " + t);
         int innerTotal = dump(firstPageBlockIdx, stream, " ");
@@ -116,44 +126,59 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     public void put(String key, TreeData data) {
-        //TODO: here shall be lock for main data. and it will be enough
-        InsertionResult result = findAndInsert(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key), data);
-        if (result.requiresParentModification()) {
-            try (BlockToModify<Page> newFirstPageBlock = allocator.allocateToModify(Page.class)) {
-                PageInfo pageInfo = newFirstPageBlock.getBlock().pageInfo;
-                pageInfo.countOfEntries = 1;
-                pageInfo.lastChildPtr = result.newBlockId;
-                newFirstPageBlock.getBlock().entries[0] = result.middlePointForParent;
-                result.middlePointForParent.childPtr = result.oldBlockId;
-                firstPageBlockIdx = newFirstPageBlock.getBlockId();
+        try (Locker ignore = writeLock()) {
+            InsertionResult result = findAndInsert(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key), data);
+            if (result.requiresParentModification()) {
+                try (BlockToModify<Page> newFirstPageBlock = allocator.allocateToModify(Page.class)) {
+                    PageInfo pageInfo = newFirstPageBlock.getBlock().pageInfo;
+                    pageInfo.countOfEntries = 1;
+                    pageInfo.lastChildPtr = result.newBlockId;
+                    newFirstPageBlock.getBlock().entries[0] = result.middlePointForParent;
+                    result.middlePointForParent.childPtr = result.oldBlockId;
+                    firstPageBlockIdx = newFirstPageBlock.getBlockId();
+                }
             }
         }
 
     }
 
     public void close() {
-        try (BlockToModify<TreeInfo> treeInfo = allocator.getToModify(metaBlockIdx, TreeInfo.class)) {
-            treeInfo.getBlock().totalCount = totalCount;
-            treeInfo.getBlock().rootPageIdx = firstPageBlockIdx;
+        try (Locker ignore = writeLock()) {
+            try (BlockToModify<TreeInfo> treeInfo = allocator.getToModify(metaBlockIdx, TreeInfo.class)) {
+                treeInfo.getBlock().totalCount = totalCount;
+                treeInfo.getBlock().rootPageIdx = firstPageBlockIdx;
+            }
         }
         allocator.close();
     }
 
     public boolean contains(String key) {
-        return find(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key)) != null;
+        try (Locker ignore = readLock()) {
+            return find(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key)) != null;
+        }
     }
 
     public long get(String key) {
-        TreeEntry treeEntry = find(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
+        TreeEntry treeEntry;
+        try (Locker ignore = readLock()) {
+            treeEntry = find(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
+        }
         return treeEntry != null ? treeEntry.data : Pointer.NULL_PTR;
     }
 
     public Iterator<String> iterator() {
-
-        final int currentModCount = modCount;
-        return new KeysIterator(currentModCount);
+        try (Locker ignore = readLock()) {
+            return new KeysIterator(modCount);
+        }
     }
 
+    private Locker readLock() {
+        return new Locker(treeLock.readLock());
+    }
+
+    private Locker writeLock() {
+        return new Locker(treeLock.writeLock());
+    }
 
     private int hash(String key) {
         return key.hashCode();
@@ -217,6 +242,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     private TreeEntry deleteEntryAt(Page page, int index) {
+        modCount++;
         int count = page.pageInfo.countOfEntries;
         if (count == 0) {
             return null;
