@@ -97,6 +97,11 @@ public class BTree implements Iterable<String>, AutoCloseable {
         TreeEntry entry;
         try (Locker ignore = writeLock()) {
             entry = findAndDelete(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
+            Page firstPage = allocator.get(firstPageBlockIdx, Page.class);
+            if (firstPage.getCount() == 0 && Pointer.isValidNext(firstPage.pageInfo.lastChildPtr)) {
+                allocator.free(firstPageBlockIdx);
+                firstPageBlockIdx = firstPage.pageInfo.lastChildPtr;
+            }
         }
         return entry != null ? entry.data : Pointer.NULL_PTR;
     }
@@ -189,7 +194,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
         Page pageBlock = allocator.get(page, Page.class);
         int count = pageBlock.pageInfo.countOfEntries;
         total += count;
-        stream.println(prefix + "Node entries: " + count);
+        stream.println(prefix + "Node entries: " + count + "  <" + page + ">" );
         for (int i = 0; i < count; i++) {
             TreeEntry entry = pageBlock.entries[i];
             stream.println(prefix + i + ": " + entry.keyPart + " [#" + entry.hash + "]");
@@ -208,72 +213,160 @@ public class BTree implements Iterable<String>, AutoCloseable {
         return total;
     }
 
-
-    //TODO: switch to binarysearch too
     private TreeEntry findAndDelete(int page, String key, String truncatedKey, int hash) {
-        int nextPage = Pointer.NULL_PTR;
         TreeEntry deleted = null;
+        int childPagePtr, nextChildPagePtr, pos;
         try (BlockToModify<Page> pageBlock = allocator.getToModify(page, Page.class)) {
-            PageInfo pageInfo = pageBlock.getBlock().pageInfo;
+            Page pageStruct = pageBlock.getBlock();
+            PageInfo pageInfo = pageStruct.pageInfo;
             int count = pageInfo.countOfEntries;
-            for (int i = 0; i < count; i++) {
-                TreeEntry entry = pageBlock.getBlock().entries[i];
-                int comparisonResult = compare(hash, truncatedKey, key, entry);
-                if (comparisonResult == 0) {
-                    deleted = deleteEntryAt(pageBlock.getBlock(), i);
-                    break;
-                }
-                else if (comparisonResult < 0) {
-                    nextPage = entry.childPtr;
-                    if (Pointer.isValidNext(nextPage)) {
-                        deleted = findAndDelete(nextPage, key, truncatedKey, hash);
-                    }
-                    break;
-                }
-                //else continue
+            pos = Arrays.binarySearch(pageStruct.entries, 0, count, new TreeEntryKey(key, truncatedKey, hash), TREE_ENTRY_COMPARATOR);
+            if (pos >= 0) {
+                deleted = deleteEntryAt(pageStruct, pos, false);
+                childPagePtr = pageStruct.child(pos);
             }
-            //not found, observe last child if any
-            if (pageInfo.hasLastChild()) {
-                deleted = findAndDelete(pageInfo.lastChildPtr, key, truncatedKey, hash);
+            else {
+                pos = -pos-1;
+                childPagePtr = pageStruct.child(pos);
+
+                if (Pointer.isValidNext(childPagePtr)) {
+                    deleted = findAndDelete(childPagePtr, key, truncatedKey, hash);
+                }
+            }
+            if (childPagePtr == pageStruct.pageInfo.lastChildPtr && pos > 0) {
+                pos-=1;
+                childPagePtr = pageStruct.child(pos);
+            }
+            nextChildPagePtr = pageStruct.nextChild(pos);
+            if (Pointer.isValidNext(childPagePtr) && Pointer.isValidNext(nextChildPagePtr)) {
+                doEnsureCapacity(pageStruct, pageInfo, pos, count, childPagePtr, nextChildPagePtr);
             }
         }
         return deleted;
-
     }
 
-    private TreeEntry deleteEntryAt(Page page, int index) {
-        modCount++;
-        int count = page.pageInfo.countOfEntries;
-        if (count == 0) {
-            return null;
+    private TreeEntry deleteEntryAt(Page pageStruct, int index, boolean withChildren) {
+        int count = pageStruct.getCount();
+        TreeEntry entryToDelete = pageStruct.entries[index];
+        if (!entryToDelete.hasChildren() || withChildren) {
+            deleteEntryFromPage(pageStruct, index, count);
         }
-        TreeEntry entry = page.entries[index];
-        TreeEntry removed = entry;
-        if (entry.hasChildren()) {
-            int linkToNextPage = index == count - 1 ? page.pageInfo.lastChildPtr : page.entries[index + 1].childPtr;
-            if (Pointer.isValidNext(linkToNextPage)) {
-                try (BlockToModify<Page> nextPage = allocator.getToModify(linkToNextPage, Page.class)) {
-                    int childCount = nextPage.getBlock().pageInfo.countOfEntries;
-                    if (childCount != 0) {
-                        TreeEntry firstChild = deleteEntryAt(nextPage.getBlock(), 0);
-                        page.entries[index] = firstChild;
-                        firstChild.childPtr = removed.childPtr;
-                    }
-                    if (childCount <= 1) {
-                        allocator.free(entry.childPtr);
-                        entry.childPtr = Pointer.NULL_PTR;
-                    }
-                }
+        else {
+            int childPagePtr = pageStruct.child(index);
+            int nextChildPagePtr = pageStruct.nextChild(index);
+            Page childPage = allocator.get(childPagePtr, Page.class);
+            Page nextChildPage = Pointer.isValidNext(nextChildPagePtr) ? allocator.get(nextChildPagePtr, Page.class) : null;
+            TreeEntry replacement;
+            if (nextChildPage == null || childPage.getCount() > nextChildPage.getCount()) {
+                replacement = deleteEntryAt(childPage, childPage.getCount() - 1, false);
+                allocator.saveModifications(childPagePtr, childPage);
             }
-        }
-        if (!entry.hasChildren()) {
-            //simple case - it allows having < minCount entries
-            System.arraycopy(page.entries, index, page.entries, index + 1, count - 1 - index);
-            page.pageInfo.countOfEntries--;
-            totalCount--;
+            else {
+                replacement = deleteEntryAt(nextChildPage, 0, false);
+                allocator.saveModifications(nextChildPagePtr, nextChildPage);
+            }
+            pageStruct.entries[index] = replacement;
+            replacement.childPtr = childPagePtr;
+            entryToDelete.childPtr = Pointer.NULL_PTR;
+
+            doEnsureCapacity(pageStruct, pageStruct.pageInfo, index, count, childPagePtr, nextChildPagePtr);
 
         }
-        return removed;
+
+        return entryToDelete;
+    }
+
+    private void doEnsureCapacity(Page pageStruct, PageInfo pageInfo, int pos, int count, int childPagePtr, int nextChildPagePtr) {
+        if (!Pointer.isValidNext(nextChildPagePtr)) return;
+        Page childPage = allocator.get(childPagePtr, Page.class);
+        Page nextChildPage = allocator.get(nextChildPagePtr, Page.class);
+        DeletionResult res = ensureCapacity(pageStruct.entries[pos], childPage, nextChildPage);
+        switch (res.action) {
+            case CHANGE_NEXT_CHILD_LINK:
+                pageInfo.countOfEntries = deleteEntryFromPage(pageStruct, pos, count);
+                totalCount++;
+                pageStruct.setChild(pos, childPagePtr);
+                break;
+            case REPLACE_PARENT:
+                pageStruct.entries[pos] = res.replacementEntry;
+                break;
+        }
+        allocator.saveModifications(childPagePtr, childPage);
+        allocator.saveModifications(nextChildPagePtr, nextChildPage);
+        //tODO: case when child page exists, but next child does not (last child, for example)
+    }
+
+
+    private static enum AfterDelete {
+        NOTHING,
+        REPLACE_PARENT,
+        CHANGE_NEXT_CHILD_LINK
+    }
+
+    private static class DeletionResult {
+        final TreeEntry replacementEntry;
+        final AfterDelete action;
+
+        private DeletionResult(TreeEntry replacementEntry, AfterDelete action) {
+            this.replacementEntry = replacementEntry;
+            this.action = action;
+        }
+
+        public static DeletionResult done() {
+            return new DeletionResult(null, AfterDelete.NOTHING);
+        }
+
+        public static DeletionResult replaceParent(TreeEntry replacementEntry) {
+            return new DeletionResult(replacementEntry, AfterDelete.REPLACE_PARENT);
+        }
+
+        public static DeletionResult deleteParent() {
+            return new DeletionResult(null, AfterDelete.CHANGE_NEXT_CHILD_LINK);
+        }
+    }
+
+    private DeletionResult ensureCapacity(TreeEntry parent, Page childLeft, Page childRight) {
+        if (childLeft.getCount() >= minAmount && childRight.getCount() >= minAmount) return DeletionResult.done();
+        int oldPtr = parent.childPtr;
+        if (childLeft.getCount() + childRight.getCount() + 1 <= minAmount + minAmount) {
+            //unite
+            childLeft.entries[childLeft.pageInfo.countOfEntries] = parent;
+            parent.childPtr = childLeft.pageInfo.lastChildPtr;
+            System.arraycopy(childRight.entries, 0, childLeft.entries, childLeft.pageInfo.countOfEntries + 1, childRight.pageInfo.countOfEntries);
+            childLeft.pageInfo.countOfEntries += 1 + childRight.pageInfo.countOfEntries;
+            childLeft.pageInfo.lastChildPtr = childRight.pageInfo.lastChildPtr;
+            return DeletionResult.deleteParent();
+        }
+        else if (childLeft.getCount() < minAmount) {
+            //shift one item from right
+            childLeft.entries[childLeft.pageInfo.countOfEntries] = parent;
+            childLeft.pageInfo.countOfEntries++;
+            parent.childPtr = childLeft.pageInfo.lastChildPtr;
+            TreeEntry newParent = deleteEntryAt(childRight, 0, true);
+            childLeft.pageInfo.lastChildPtr = newParent.childPtr;
+            totalCount++;   //TODO: have to return it back as node actually not deleted. probably better to have param in deleteEntryAt
+            newParent.childPtr = oldPtr;
+            return DeletionResult.replaceParent(newParent);
+        } else {    //childRight.getCount() < minAmount
+            //shift one from left
+            System.arraycopy(childRight.entries, 0, childRight.entries, 1, childRight.getCount());
+            childRight.entries[0] = parent;
+            childRight.pageInfo.countOfEntries++;
+            parent.childPtr = childLeft.pageInfo.lastChildPtr;
+            TreeEntry newParent = deleteEntryAt(childLeft, childLeft.getCount() - 1, true);
+            childLeft.pageInfo.lastChildPtr = newParent.childPtr;
+            totalCount++;
+            newParent.childPtr = oldPtr;
+            return DeletionResult.replaceParent(newParent);
+        }
+    }
+
+
+    private int deleteEntryFromPage(Page page, int index, int count) {
+        System.arraycopy(page.entries, index + 1, page.entries, index, count - 1 - index);
+        page.pageInfo.countOfEntries--;
+        totalCount--;
+        return page.pageInfo.countOfEntries;
     }
 
 

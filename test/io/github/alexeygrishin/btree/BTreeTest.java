@@ -1,5 +1,6 @@
 package io.github.alexeygrishin.btree;
 
+import io.github.alexeygrishin.blockalloc.BlockAllocator;
 import io.github.alexeygrishin.bytestorage.Counter;
 import io.github.alexeygrishin.bytestorage.MemoryContainer;
 import io.github.alexeygrishin.tool.TestTool;
@@ -12,7 +13,7 @@ import java.util.*;
 import static io.github.alexeygrishin.btree.TreeHelper.*;
 import static org.junit.Assert.*;
 
-public class StorableTreeTest {
+public class BTreeTest {
 
 
     public static class EmptyTree {
@@ -130,7 +131,30 @@ public class StorableTreeTest {
 
     }
 
+    private static List<String> pre(String... preset) {
+        return Arrays.asList(preset);
+    }
+
+    private static List<String> pre(int from, int to) {
+        List<String> str = new ArrayList<>();
+        for (int i = from; i <= to; i++) {
+            str.add(String.format("%02d", i));
+        }
+        return str;
+    }
+
+
+
     public static class PutConsistency {
+
+        private static final int BTREE_T = 2;
+
+        private static void assertPages(Counter ctr, int expected) {
+            int blocks = (int)(ctr.getSize() / blockSize(BTREE_T));
+            assertEquals("Tree acquired more/less block than expected", expected, blocks - 1);  //1 is for TreeInfo
+        }
+
+
 
         private void putAndThenCheck(BTree tree, List<String> preset, String... expectedKeys) {
             for (String key: preset) {
@@ -152,19 +176,9 @@ public class StorableTreeTest {
             }
         }
 
-        private List<String> pre(String... preset) {
-            return Arrays.asList(preset);
-        }
-
-        private void assertPages(Counter ctr, int expected) {
-            int blocks = (int)(ctr.getSize() / blockSize(BTREE_T));
-            assertEquals("Tree acquired more/less block than expected", expected, blocks - 1);  //1 is for TreeInfo
-        }
-
 
         private BTree tree;
         private Counter ctr;
-        private static final int BTREE_T = 2;
 
         @Before
         public void setup() {
@@ -262,6 +276,141 @@ public class StorableTreeTest {
         @After
         public void log() {
             //tree.dump(System.out);
+        }
+
+
+    }
+
+    public static class RemoveConsistency {
+
+        private Counter ctr;
+        private BTree tree;
+        private final static int BTREE_T = 3;
+
+        @Before
+        public void setup() {
+            ctr = new Counter(new MemoryContainer());
+            tree = createTree(BTREE_T, ctr);
+        }
+
+        private void removeAndThenCheck(BTree tree, List<String> preset, String... removedKeys) {
+            for (String key: preset) {
+                tree.put(key, key.hashCode());
+            }
+            //System.out.println("### Before delete");
+            //tree.dump(System.out);
+            ctr.resetCounters();
+            List<String> expected = new ArrayList<>( preset);
+            for (String key: removedKeys) {
+                tree.remove(key);
+                expected.remove(key);
+            }
+            //System.out.println("### After delete");
+            //tree.dump(System.out);
+            List<String> actual = TestTool.iteratorToList(tree);
+            assertListsEqual("Tree keys do not match expectations", expected, actual);
+            assertEquals("Tree keys match expectations, but tree size is declared incorrectly", expected.size(), tree.size());
+            for (String key: removedKeys) {
+                assertTrue("Tree keys match expectations, but removed key '" + key + "' can be found in tree", !tree.contains(key));
+            }
+            for (String key: expected) {
+                assertTrue("Tree keys match expectations, but remaining key '" + key + "' cannot be found in tree", tree.contains(key));
+            }
+        }
+
+        @Test
+        public void singleElement() {
+            //    [1]
+            // - 1 =>
+            //    []
+            removeAndThenCheck(tree, pre("1"),"1");
+        }
+
+        @Test
+        public void leafElement_uniteNodes() {
+            //    [3,   |]
+            //    [1,2][4,5]
+            // - 1 =>
+            //    [2,3,4,5]
+            removeAndThenCheck(tree, pre("1","2","3","4","5"), "1");
+        }
+
+        @Test
+        public void leafElement_noShrink() {
+            //    [4,     |]
+            //    [1,2,3][5,6,7]
+            // - 1 =>
+            //    [4,     |]
+            //    [2,3][5,6,7]
+            removeAndThenCheck(tree, pre("1","2","4","5","6","3","7"), "1");
+        }
+
+        @Test
+        public void leafElement_replaceParent() {
+            //  [4,     |]
+            //  [2,3]  [5,6,7]
+            // - 2 =>
+            //  [3,4,5,6,7]
+            removeAndThenCheck(tree, pre("1","2","4","5","6","3","7"), "1", "2");
+        }
+
+        @Test
+        public void parentElement_root() {
+            //    [3,   |]
+            //    [1,2][4,5]
+            // - 3 =>
+            //    [1,2,4,5]
+            removeAndThenCheck(tree, pre("1","2","3","4","5"), "3");
+        }
+
+        @Test
+        public void shift_left() {
+            //      [10,     |]
+            //      [6,7]    [11,12,13,14]
+            // - 6 =>
+            //      [11,     |]
+            //      [7,10]  [12,13,14]
+            removeAndThenCheck(tree, pre("6","7","10","11","12","13","14"), "6");
+        }
+
+        @Test
+        public void shift_right() {
+            //      [10,      |]
+            //      [1,2,3,4][12,13]
+            // - 12 =>
+            //      [4,     |]
+            //      [1,2,3][10,13]
+            removeAndThenCheck(tree, pre("1","2","10","12","13","3","4"), "12");
+        }
+
+        @Test
+        public void nonRoot_withChildren() {
+            //     [9,              18,                  |]
+            //     [3,   6,   |]   [12,   15,    |]      [21,   24,    27,    |]
+            //     [1,2][4,5][7,8] [10,11][13,14][16,17][19,20][22,23][25,26][28,29,30]
+            // - 15 =>
+            //
+
+            removeAndThenCheck(tree, pre(1,30), "15");
+        }
+
+        @Test
+        public void shift_nodeWithChildren() {
+            //     [9,              18,                  |]
+            //     [3,   6,   |]   [12,   15,    |]      [21,   24,    27,    |]
+            //     [1,2][4,5][7,8] [10,11][13,14][16,17][19,20][22,23][25,26][28,29,30]
+            // - 15 =>
+            //
+
+            removeAndThenCheck(tree, pre(1,30), "21", "24");
+        }
+
+        @Test
+        public void delete_lot_of() {
+            //     [9,              18,                  |]
+            //     [3,   6,   |]   [12,   15,    |]      [21,   24,    27,    |]
+            //     [1,2][4,5][7,8] [10,11][13,14][16,17][19,20][22,23][25,26][28,29,30]
+            removeAndThenCheck(tree, pre(1,30), "12","15","18","24","29","03","01","04","30","16","10","17","11","22","23","25","26","28","07","08","05","06");
         }
 
 
