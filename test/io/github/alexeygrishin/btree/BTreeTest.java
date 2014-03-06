@@ -273,11 +273,6 @@ public class BTreeTest {
             assertPages(ctr, 7);
         }
 
-        @After
-        public void log() {
-            //tree.dump(System.out);
-        }
-
 
     }
 

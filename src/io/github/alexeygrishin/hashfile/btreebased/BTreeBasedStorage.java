@@ -2,6 +2,7 @@ package io.github.alexeygrishin.hashfile.btreebased;
 
 import io.github.alexeygrishin.blockalloc.Allocator;
 import io.github.alexeygrishin.btree.*;
+import io.github.alexeygrishin.common.Pointer;
 import io.github.alexeygrishin.hashfile.NamedStorage;
 
 import java.io.*;
@@ -32,8 +33,7 @@ public class BTreeBasedStorage implements NamedStorage {
     @Override
     public boolean getInto(String key, OutputStream stream) {
         long pointer = tree.get(key);
-        //TODO: NO_LINK - global const
-        if (pointer <= 0) return false;
+        if (!Pointer.isValid(pointer)) return false;
         storage.select((int)pointer, stream);
         return true;
     }

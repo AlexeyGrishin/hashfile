@@ -215,12 +215,12 @@ public class BTree implements Iterable<String>, AutoCloseable {
 
     private TreeEntry findAndDelete(int page, String key, String truncatedKey, int hash) {
         TreeEntry deleted = null;
-        int childPagePtr, nextChildPagePtr, pos;
         try (BlockToModify<Page> pageBlock = allocator.getToModify(page, Page.class)) {
             Page pageStruct = pageBlock.getBlock();
             PageInfo pageInfo = pageStruct.pageInfo;
             int count = pageInfo.countOfEntries;
-            pos = Arrays.binarySearch(pageStruct.entries, 0, count, new TreeEntryKey(key, truncatedKey, hash), TREE_ENTRY_COMPARATOR);
+            int pos = Arrays.binarySearch(pageStruct.entries, 0, count, new TreeEntryKey(key, truncatedKey, hash), TREE_ENTRY_COMPARATOR);
+            int childPagePtr;
             if (pos >= 0) {
                 deleted = deleteEntryAt(pageStruct, pos, false);
                 childPagePtr = pageStruct.child(pos);
@@ -237,19 +237,22 @@ public class BTree implements Iterable<String>, AutoCloseable {
                 pos-=1;
                 childPagePtr = pageStruct.child(pos);
             }
-            nextChildPagePtr = pageStruct.nextChild(pos);
+            int nextChildPagePtr = pageStruct.nextChild(pos);
             if (Pointer.isValidNext(childPagePtr) && Pointer.isValidNext(nextChildPagePtr)) {
-                doEnsureCapacity(pageStruct, pageInfo, pos, count, childPagePtr, nextChildPagePtr);
+                rebalanceNode(pageStruct, pageInfo, pos, count, childPagePtr, nextChildPagePtr);
             }
         }
         return deleted;
     }
 
-    private TreeEntry deleteEntryAt(Page pageStruct, int index, boolean withChildren) {
+    private TreeEntry deleteEntryAt(Page pageStruct, int index, boolean detachOnly) {
         int count = pageStruct.getCount();
         TreeEntry entryToDelete = pageStruct.entries[index];
-        if (!entryToDelete.hasChildren() || withChildren) {
+        if (!entryToDelete.hasChildren() || detachOnly) {
             deleteEntryFromPage(pageStruct, index, count);
+            if (!detachOnly) {
+                totalCount--;
+            }
         }
         else {
             int childPagePtr = pageStruct.child(index);
@@ -269,14 +272,14 @@ public class BTree implements Iterable<String>, AutoCloseable {
             replacement.childPtr = childPagePtr;
             entryToDelete.childPtr = Pointer.NULL_PTR;
 
-            doEnsureCapacity(pageStruct, pageStruct.pageInfo, index, count, childPagePtr, nextChildPagePtr);
+            rebalanceNode(pageStruct, pageStruct.pageInfo, index, count, childPagePtr, nextChildPagePtr);
 
         }
 
         return entryToDelete;
     }
 
-    private void doEnsureCapacity(Page pageStruct, PageInfo pageInfo, int pos, int count, int childPagePtr, int nextChildPagePtr) {
+    private void rebalanceNode(Page pageStruct, PageInfo pageInfo, int pos, int count, int childPagePtr, int nextChildPagePtr) {
         if (!Pointer.isValidNext(nextChildPagePtr)) return;
         Page childPage = allocator.get(childPagePtr, Page.class);
         Page nextChildPage = allocator.get(nextChildPagePtr, Page.class);
@@ -284,7 +287,6 @@ public class BTree implements Iterable<String>, AutoCloseable {
         switch (res.action) {
             case CHANGE_NEXT_CHILD_LINK:
                 pageInfo.countOfEntries = deleteEntryFromPage(pageStruct, pos, count);
-                totalCount++;
                 pageStruct.setChild(pos, childPagePtr);
                 break;
             case REPLACE_PARENT:
@@ -293,7 +295,6 @@ public class BTree implements Iterable<String>, AutoCloseable {
         }
         allocator.saveModifications(childPagePtr, childPage);
         allocator.saveModifications(nextChildPagePtr, nextChildPage);
-        //tODO: case when child page exists, but next child does not (last child, for example)
     }
 
 
@@ -337,25 +338,23 @@ public class BTree implements Iterable<String>, AutoCloseable {
             childLeft.pageInfo.lastChildPtr = childRight.pageInfo.lastChildPtr;
             return DeletionResult.deleteParent();
         }
-        else if (childLeft.getCount() < minAmount) {
-            //shift one item from right
-            childLeft.entries[childLeft.pageInfo.countOfEntries] = parent;
-            childLeft.pageInfo.countOfEntries++;
-            parent.childPtr = childLeft.pageInfo.lastChildPtr;
-            TreeEntry newParent = deleteEntryAt(childRight, 0, true);
+        else  {
+            TreeEntry newParent;
+            if (childLeft.getCount() < minAmount) {
+                //shift one item from right
+                childLeft.entries[childLeft.pageInfo.countOfEntries] = parent;
+                childLeft.pageInfo.countOfEntries++;
+                parent.childPtr = childLeft.pageInfo.lastChildPtr;
+                newParent = deleteEntryAt(childRight, 0, true);
+            } else {    // == childRight.getCount() < minAmount
+                //shift one from left
+                System.arraycopy(childRight.entries, 0, childRight.entries, 1, childRight.getCount());
+                childRight.entries[0] = parent;
+                childRight.pageInfo.countOfEntries++;
+                parent.childPtr = childLeft.pageInfo.lastChildPtr;
+                newParent = deleteEntryAt(childLeft, childLeft.getCount() - 1, true);
+            }
             childLeft.pageInfo.lastChildPtr = newParent.childPtr;
-            totalCount++;   //TODO: have to return it back as node actually not deleted. probably better to have param in deleteEntryAt
-            newParent.childPtr = oldPtr;
-            return DeletionResult.replaceParent(newParent);
-        } else {    //childRight.getCount() < minAmount
-            //shift one from left
-            System.arraycopy(childRight.entries, 0, childRight.entries, 1, childRight.getCount());
-            childRight.entries[0] = parent;
-            childRight.pageInfo.countOfEntries++;
-            parent.childPtr = childLeft.pageInfo.lastChildPtr;
-            TreeEntry newParent = deleteEntryAt(childLeft, childLeft.getCount() - 1, true);
-            childLeft.pageInfo.lastChildPtr = newParent.childPtr;
-            totalCount++;
             newParent.childPtr = oldPtr;
             return DeletionResult.replaceParent(newParent);
         }
@@ -365,7 +364,6 @@ public class BTree implements Iterable<String>, AutoCloseable {
     private int deleteEntryFromPage(Page page, int index, int count) {
         System.arraycopy(page.entries, index + 1, page.entries, index, count - 1 - index);
         page.pageInfo.countOfEntries--;
-        totalCount--;
         return page.pageInfo.countOfEntries;
     }
 
