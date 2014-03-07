@@ -27,9 +27,6 @@ public class TreeEntry {
         this.data = data;
         this.childPtr = childPtr;
     }
-    public TreeEntry(String key, int hash, long data, TreeNameHelper helper) {
-        this(key, hash, data, helper, Pointer.NULL_PTR);
-    }
 
     public boolean hasChildren() {
         return Pointer.isValid(childPtr);

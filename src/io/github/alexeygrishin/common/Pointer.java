@@ -7,6 +7,8 @@ package io.github.alexeygrishin.common;
  */
 public class Pointer {
 
+    private Pointer() {}
+
     public static final int NULL_PTR = -1;
 
     public static boolean isValid(long pointer) {

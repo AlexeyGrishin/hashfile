@@ -1,5 +1,6 @@
 package io.github.alexeygrishin.btree;
 
+import io.github.alexeygrishin.blockalloc.Allocator;
 import io.github.alexeygrishin.blockalloc.BlockAllocator;
 import io.github.alexeygrishin.bytestorage.Counter;
 import io.github.alexeygrishin.bytestorage.MemoryContainer;
@@ -15,6 +16,40 @@ import static org.junit.Assert.*;
 
 public class BTreeTest {
 
+    public static class Constructor {
+
+        private Allocator createAllocator(int blockSize) {
+            return new BlockAllocator(new MemoryContainer(), blockSize);
+        }
+
+        @Test(expected = IllegalArgumentException.class)
+        public void create_blockSmallerThanEntry() {
+            new BTree(createAllocator(255));
+        }
+
+        @Test(expected = IllegalArgumentException.class)
+        public void create_blockContainsFractNumberOfEntries() {
+            new BTree(createAllocator(500));
+        }
+
+        @Test(expected = IllegalArgumentException.class)
+        public void create_blockContainsOddEntries() {
+            new BTree(createAllocator(1280));
+        }
+
+        @Test(expected = IllegalArgumentException.class)
+        public void create_blockContains1Entry() {
+            new BTree(createAllocator(512));
+        }
+
+        @Test
+        public void create_blockContainsEvenEntries() {
+            new BTree(createAllocator(1024));
+        }
+
+
+
+    }
 
     public static class EmptyTree {
         @Test
@@ -274,6 +309,57 @@ public class BTreeTest {
         }
 
 
+    }
+
+    public static class Iterating {
+        private BTree tree;
+
+        @Before
+        public void setup() {
+            tree = createTree(blockSize(5));
+            for (String key: pre(1, 10)) {
+                tree.put(key, 1);
+            }
+        }
+
+        @Test
+        public void iterate_all() {
+            for (String key: tree) {
+                //just iterate
+            }
+        }
+
+        @Test(expected = ConcurrentModificationException.class)
+        public void iterate_removeConcurrently() {
+            Iterator<String> iter = tree.iterator();
+            iter.next();
+            tree.remove("01");
+            iter.next();
+        }
+
+        @Test
+        public void iterate_removeConcurrently_nonExistent() {
+            Iterator<String> iter = tree.iterator();
+            iter.next();
+            tree.remove("-1");
+            iter.next();
+        }
+
+        @Test(expected = ConcurrentModificationException.class)
+        public void iterate_addConcurrently() {
+            Iterator<String> iter = tree.iterator();
+            iter.next();
+            tree.put("-1", 1);
+            iter.next();
+        }
+
+        @Test
+        public void iterate_updateConcurrently() {
+            Iterator<String> iter = tree.iterator();
+            iter.next();
+            tree.put("01", 1);
+            iter.next();
+        }
     }
 
     public static class RemoveConsistency {

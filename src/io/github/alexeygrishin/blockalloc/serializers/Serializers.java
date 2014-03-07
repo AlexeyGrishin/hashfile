@@ -113,10 +113,6 @@ public class Serializers {
         return get(kls).getSize();
     }
 
-    public <T> void put(Class<T> kls, Serializer<T> serializer) {
-        serializers.put(kls, serializer);
-    }
-
     public static final Serializers INSTANCE = new Serializers();
 
     private Serializer getSerializerFromClass(Class<?> kls) {

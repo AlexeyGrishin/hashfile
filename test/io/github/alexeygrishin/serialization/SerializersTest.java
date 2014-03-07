@@ -1,6 +1,7 @@
 package io.github.alexeygrishin.serialization;
 
 import io.github.alexeygrishin.blockalloc.serializers.Limited;
+import io.github.alexeygrishin.blockalloc.serializers.SerializationException;
 import io.github.alexeygrishin.blockalloc.serializers.Serializer;
 import io.github.alexeygrishin.blockalloc.serializers.Serializers;
 import org.junit.Before;
@@ -71,6 +72,15 @@ public class SerializersTest {
         //ok, no error
     }
 
+    @Test(expected = SerializationException.class)
+    public void structWithByteArray_changeLength() {
+        Serializer<StructWithByteArray> serializer = Serializers.INSTANCE.get(StructWithByteArray.class);
+        StructWithByteArray struct = serializer.load(buffer);
+        struct.bytes= new byte[100];
+        serializer.save(buffer, struct);
+        //ok, no error
+    }
+
     @Test
     public void structWithCustomSerializer() {
         Serializer<StructWithSerializer> serializer = Serializers.INSTANCE.get(StructWithSerializer.class);
@@ -78,6 +88,12 @@ public class SerializersTest {
         assertTrue(s.loadCalled);
         serializer.save(buffer, s);
         assertTrue(s.saveCalled);
+    }
+
+    @Test(expected = SerializationException.class)
+    public void structSmallForArray() {
+        Serializer<SmallStructForArray> serializer = Serializers.INSTANCE.get(SmallStructForArray.class);
+        SmallStructForArray ar = serializer.load(buffer);
     }
 
     @Limited(size = 100)
@@ -104,6 +120,11 @@ public class SerializersTest {
     public static class StructWithByteArray {
         public int val1;
         public byte[] bytes;
+    }
+
+    @Limited(size = 3)
+    public static class SmallStructForArray {
+        public Integer[] array;
     }
 
     public static class StructWithSerializer implements Serializer<StructWithSerializer> {

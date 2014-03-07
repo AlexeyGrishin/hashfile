@@ -97,6 +97,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
         TreeEntry entry;
         try (Locker ignore = writeLock()) {
             entry = findAndDelete(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
+            if (entry != null) modCount++;
             Page firstPage = allocator.get(firstPageBlockIdx, Page.class);
             if (firstPage.getCount() == 0 && Pointer.isValidNext(firstPage.pageInfo.lastChildPtr)) {
                 allocator.free(firstPageBlockIdx);
@@ -442,7 +443,6 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     private InsertionResult insertHereOrChild(int page, Page pageStruct, String key, String truncatedKey, int hash, TreeData data, int nextPage, int index, int count) {
-        modCount++;
         InsertionResult result = InsertionResult.DONE;
         if (Pointer.isValidNext(nextPage)) {
             result = findAndInsert(nextPage, key, truncatedKey, hash, data);
@@ -457,6 +457,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
         else {
             insertBefore(pageStruct, index, key, truncatedKey, hash, data.createData(), count, Pointer.NULL_PTR);
             pageStruct.pageInfo.countOfEntries++;
+            modCount++;
             totalCount++;
             allocator.saveModifications(page, pageStruct);
         }

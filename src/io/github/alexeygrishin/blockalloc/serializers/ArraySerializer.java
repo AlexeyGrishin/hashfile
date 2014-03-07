@@ -16,7 +16,7 @@ class ArraySerializer implements Serializer<Object[]> {
         int structSize = innerSerializer.getSize();
         this.count = maxSize / structSize;
         if (this.count == 0) {
-            throw new IllegalArgumentException("Field  is array of " + innerClass + " which size is " + structSize + ", but max size is " + maxSize);
+            throw new SerializationException("Field  is array of " + innerClass + " which size is " + structSize + ", but max size is " + maxSize);
         }
         this.size = this.count * structSize;
     }

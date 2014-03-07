@@ -68,6 +68,31 @@ public class NamedStorageIntegrationTest {
         }
 
         @Test
+        public void replaceLargerAndGet() {
+            String key = randomString(getKeyLen());
+            storage.saveFrom(key, generateData(getDataLen()));
+
+            storage.saveFrom(key, generateData(getDataLen() + 15));
+            ByteCounter ctr = new ByteCounter();
+
+            storage.getInto(key, ctr);
+            assertEquals(getDataLen() + 15, ctr.getCounted());
+        }
+
+        @Test
+        public void replaceSmallerAndGet() {
+            String key = randomString(getKeyLen());
+            storage.saveFrom(key, generateData(getDataLen()));
+
+            int expectedLen = getDataLen() / 2;
+            storage.saveFrom(key, generateData(expectedLen));
+
+            ByteCounter ctr = new ByteCounter();
+            storage.getInto(key, ctr);
+            assertEquals(expectedLen, ctr.getCounted());
+        }
+
+        @Test
         public void putAndIterate() {
             String key = randomString(getKeyLen());
             storage.saveFrom(key, generateData(getDataLen()));
@@ -82,6 +107,14 @@ public class NamedStorageIntegrationTest {
             storage.delete(key);
             assertFalse(storage.contains(key));
 
+        }
+
+        @Test
+        public void save_load() {
+            storage.saveFrom("01", generateData(getDataLen()));
+            storage.close();
+            storage = new BTreeBasedFactory().load(TEMP_FILE);
+            assertTrue(storage.contains("01"));
         }
 
 
