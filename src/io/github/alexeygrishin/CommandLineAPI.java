@@ -3,6 +3,7 @@ package io.github.alexeygrishin;
 import io.github.alexeygrishin.btree.KeyTruncateMethod;
 import io.github.alexeygrishin.common.Files;
 import io.github.alexeygrishin.common.RealFiles;
+import io.github.alexeygrishin.common.Source;
 import io.github.alexeygrishin.hashfile.btreebased.BTreeBasedFactory;
 import io.github.alexeygrishin.hashfile.NameBasedStorageFactory;
 import io.github.alexeygrishin.hashfile.NamedStorage;
@@ -23,20 +24,22 @@ public class CommandLineAPI {
         this.factory = factory;
         this.files = files;
         options.addOption("l", "list", false, "Shows all keys");
-        options.addOption(OptionBuilder
-                .withLongOpt("new")
-                .hasOptionalArg()
-                .withDescription("Creates new storage with provided options: [page=1024,][cache=1000,][truncate=trailing|leading]")
-                .create("n")
-        );
-        options.addOption("k", "key", true, "Provides a key to operate with");
-        options.addOption("e", "export-to", true, "Extracts data to the specified file.");
-        options.addOption("i", "import-from", true, "Imports data from the specified file. If folder specified then all files from the folder will be imported recursively.");
-        options.addOption("d", "delete", false, "Deletes data for the specified key");
-        options.addOption("c", "check", false, "Checks is the data for this key exist or not");
+        Option newOpt = new Option("n", "new", true,"Creates new storage with provided options: [page=1024,][cache=1000,][truncate=trailing|leading]");
+        newOpt.setOptionalArg(true);
+        options.addOption(newOpt);
+        options.addOption("k", "key", true, "Provides a key to operate with. Without other options just prints corresponding data to STDOUT");
+        options.addOption("e", "export-to", true, "Extracts data to the specified file (requires --key option)");
+        options.addOption("i", "import-from", true, "Imports data from the specified file (requires --key option). If folder specified then all files from the folder will be imported recursively.");
+        options.addOption("d", "delete", false, "Deletes data for the specified key (requires --key option)");
+        options.addOption("c", "check", false, "Checks is the data for this key exist or not (requires --key option)");
         options.addOption("o", "optimize", false, "Removes old data blocks, reorganizes file for less fragmentation");
         options.addOption("p", "copy-from", true, "Copies all items from specified storage");
+        readHelpHeaderFooter();
+    }
+
+    private void readHelpHeaderFooter() throws IOException {
         boolean isHeader = true;
+        String CR = System.getProperty("line.separator");
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("help.txt")))) {
             String str;
             while ((str = reader.readLine()) != null) {
@@ -44,10 +47,10 @@ public class CommandLineAPI {
                     isHeader = false;
                 }
                 else if (isHeader) {
-                    header += str;
+                    header += str + CR;
                 }
                 else {
-                    footer += str;
+                    footer += str + CR;
                 }
             }
         }
@@ -82,14 +85,14 @@ public class CommandLineAPI {
                 }
                 else if (cmd.hasOption("import-from")) {
                     String filePath = cmd.getOptionValue("import-from");
-                    String[] ids = files.resolveIds(filePath);
-                    if (ids.length == 1) {
-                        if (key == null) key = files.toKey(filePath);
-                        importFile(out, storage, key, filePath);
+                    Source[] sources = files.getSources(filePath);
+                    if (sources.length == 1) {
+                        if (key == null) key = sources[0].toKey();
+                        importFile(out, storage, key, sources[0]);
                     }
                     else {
-                        for (String id: ids) {
-                            importFile(out, storage, id, id);
+                        for (Source src: sources) {
+                            importFile(out, storage, src.toKey(), src);
                         }
                     }
                 }
@@ -97,7 +100,7 @@ public class CommandLineAPI {
                     checkKey(key);
                     String filePath = cmd.getOptionValue("export-to");
                     out.print("Exporting `" + key + "`...");
-                    if (storage.getInto(key, files.getOutputStream(filePath))) {
+                    if (storage.getInto(key, files.getSources(filePath)[0].openOutputStream())) {
                         out.println("Ok!");
                     }
                     else {
@@ -138,9 +141,9 @@ public class CommandLineAPI {
 
     }
 
-    private void importFile(PrintStream out, NamedStorage storage, String key, String filePath) {
+    private void importFile(PrintStream out, NamedStorage storage, String key, Source src) {
         out.print("Importing `" + key + "`...");
-        storage.saveFrom(key, files.getInputStream(filePath));
+        storage.saveFrom(key, src.openInputStream());
         out.println("Ok!");
     }
 
@@ -177,7 +180,8 @@ public class CommandLineAPI {
 
     private void showHelp() {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp("hashfile.jar", header, options, footer);
+        formatter.printHelp("java -jar hashfile.jar STORAGE [options]", header, options, "");
+        System.out.println(footer);
     }
 
     public static void main(String args[]) throws ParseException {

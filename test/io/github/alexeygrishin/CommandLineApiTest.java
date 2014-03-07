@@ -2,6 +2,7 @@ package io.github.alexeygrishin;
 
 import io.github.alexeygrishin.btree.KeyTruncateMethod;
 import io.github.alexeygrishin.common.Files;
+import io.github.alexeygrishin.common.Source;
 import io.github.alexeygrishin.hashfile.NameBasedStorageFactory;
 import io.github.alexeygrishin.hashfile.NamedStorage;
 import org.apache.commons.cli.ParseException;
@@ -21,12 +22,16 @@ import static org.mockito.Mockito.*;
 
 public class CommandLineApiTest {
 
+    public static final String DEFAULT_KEY = "dkey1";
+    public static final String DEFAULT_KEY_2 = "dkey2";
     @Mock
     private NamedStorage storageMock;
     @Mock
     private NameBasedStorageFactory factory;
     @Mock
     private Files files;
+    @Mock
+    private Source source1, source2;
     @Mock
     private InputStream inputStream;
     @Mock
@@ -40,15 +45,13 @@ public class CommandLineApiTest {
         api = new CommandLineAPI(factory, files);
         when(factory.create(anyString(), any(Integer.class), any(Integer.class), any(KeyTruncateMethod.class))).thenReturn(storageMock);
         when(factory.load(anyString())).thenReturn(storageMock);
-        when(files.getInputStream(anyString())).thenReturn(inputStream);
-        when(files.getOutputStream(anyString())).thenReturn(outputStream);
-        when(files.toKey(anyString())).then(new ReturnsArgumentAt(0));
-        when(files.resolveIds(anyString())).then(new Answer<Object>() {
-            @Override
-            public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
-                return new String[]{(String) invocationOnMock.getArguments()[0]};
-            }
-        });
+        when(source1.openInputStream()).thenReturn(inputStream);
+        when(source1.openOutputStream()).thenReturn(outputStream);
+        when(source2.openInputStream()).thenReturn(inputStream);
+        when(source2.openOutputStream()).thenReturn(outputStream);
+        when(source1.toKey()).thenReturn(DEFAULT_KEY);
+        when(source2.toKey()).thenReturn(DEFAULT_KEY_2);
+        when(files.getSources(anyString())).thenReturn(new Source[] {source1});
     }
 
     @Test
@@ -92,57 +95,61 @@ public class CommandLineApiTest {
     @Test
     public void importFrom_withoutKey() throws FileNotFoundException, ParseException {
         processArgs("path1", "--import-from", "file1");
-        verify(files).getInputStream("file1");
-        verify(files).resolveIds("file1");
-        verify(files).toKey("file1");
+        verify(files).getSources("file1");
+        verify(source1).openInputStream();
+        verify(source1).toKey();
         verify(factory).load("path1");
-        verify(storageMock).saveFrom("file1", inputStream);
+        verify(storageMock).saveFrom(DEFAULT_KEY, inputStream);
         verify(storageMock).close();
-        verifyNoMoreInteractions(files, factory, storageMock);
+        verifyNoMoreInteractions(files, factory, source1, storageMock);
     }
 
     @Test
     public void importFrom_withKey() throws FileNotFoundException, ParseException {
         processArgs("path1", "--import-from", "file1", "--key", "key1");
-        verify(files).resolveIds("file1");
-        verify(files).getInputStream("file1");
+        verify(files).getSources("file1");
+        verify(source1).openInputStream();
         verify(factory).load("path1");
         verify(storageMock).saveFrom("key1", inputStream);
         verify(storageMock).close();
-        verifyNoMoreInteractions(files, factory, storageMock);
+        verifyNoMoreInteractions(files, factory, source1, storageMock);
     }
+    //TODO: check invalid values
 
     @Test
     public void importFrom_folder_withoutKey() throws FileNotFoundException, ParseException {
-        when(files.resolveIds("folder1")).thenReturn(new String[] {"folder1/file1", "folder2/file2"});
+        when(files.getSources("folder1")).thenReturn(new Source[] {source1, source2});
         processArgs("path1", "--import-from", "folder1");
         verify(factory).load("path1");
-        verify(files).resolveIds("folder1");
-        verify(files).getInputStream("folder1/file1");
-        verify(files).getInputStream("folder1/file2");
-        verify(storageMock).saveFrom("folder1/file1", inputStream);
-        verify(storageMock).saveFrom("folder1/file2", inputStream);
+        verify(files).getSources("folder1");
+        verify(source1).openInputStream();
+        verify(source2).openInputStream();
+        verify(source1).toKey();
+        verify(source2).toKey();
+        verify(storageMock).saveFrom(DEFAULT_KEY, inputStream);
+        verify(storageMock).saveFrom(DEFAULT_KEY_2, inputStream);
         verify(storageMock).close();
-        verifyNoMoreInteractions(files, factory, storageMock);
+        verifyNoMoreInteractions(files, factory, source1, storageMock);
     }
 
     @Test
     public void importFrom_folder_withKey() throws FileNotFoundException, ParseException {
-        when(files.resolveIds("folder1")).thenReturn(new String[] {"folder1/file1", "folder2/file2"});
+        when(files.getSources("folder1")).thenReturn(new Source[] {source1, source2});
         processArgs("path1", "--import-from", "folder1", "--key", "key1");
-        verify(files).getInputStream("folder1/file1");
-        verify(files).getInputStream("folder1/file2");
+        verify(storageMock).saveFrom(DEFAULT_KEY, inputStream);
+        verify(storageMock).saveFrom(DEFAULT_KEY_2, inputStream);
         //key is ignored
     }
 
     @Test
     public void exportTo() throws FileNotFoundException, ParseException {
         processArgs("path1", "--export-to", "file1", "--key", "key1");
-        verify(files).getOutputStream("file1");
+        verify(files).getSources("file1");
+        verify(source1).openOutputStream();
         verify(factory).load("path1");
         verify(storageMock).getInto("key1", outputStream);
         verify(storageMock).close();
-        verifyNoMoreInteractions(files, factory, storageMock);
+        verifyNoMoreInteractions(files, factory, source1, storageMock);
     }
 
     @Test

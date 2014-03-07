@@ -1,3 +1,39 @@
-Header TODO: help
+
+Operates with name-based storage stored in single file specified as first argument. Running without args shows this help.
+
+
 <options>
-Footer
+
+Notes
+----------------
+* Keys are case-sensitive
+* Keys are theoretically unlimited
+* It is possible to import the whole folder (--import-from=<folder-path>), but there is no way for batch export or
+  delete
+* Deletion does not reduces file size in order to avoid fragmentation. After many removes it is a good idea
+  to reorganize file using --optimize option.
+  Note that --optimize option could be used together with other operations
+* Default block-size of storage file is 1M, it means that for each entry at least 1M block is allocated even
+  if data is small. If you have a lot of small files to import then storage file will grow very fast. To resolve
+  it create another db with smaller blocksize (see next section) and copy data there with --copy-from option.
+  Example:
+
+  java -jar hashfile.jar new_db --new block=4,truncate=trailing
+  java -jar hashfile.jar new_db --copy-from old_db
+
+Creation
+----------------
+When creating new storage with --new you may specify the following options separated by comma:
+
+  block=<size>          Defines the data block size, in KB.
+                        Larger means faster operations, smaller means smaller storage file size.
+                        Default is 1024 ( ==1MB)
+  cache=<limit>         Defines cache limit, in blocks.
+                        Larger means faster operations, smaller means smaller memory usage.
+                        Default depends on block size and is defined to use 64MB of memory (=64 cached items for 1MB
+                        block)
+  truncate=<method>     For long keys storage first compares some limited parts of key - first or last N characters.
+                        This method defines which characters will be used. Possible values are:
+                        * leading - to get first characters. Good for names.
+                        * trailing - to get last characters. Good for long paths or URLs.
+                        Default is leading.

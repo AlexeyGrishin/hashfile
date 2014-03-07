@@ -109,7 +109,6 @@ public class BTreeBasedFactory implements NameBasedStorageFactory {
                 throw new CannotLoadStorage("Cannot rename truncated file to " + file.getName());
             }
             beforeDelete.delete();
-            //beforeDelete.delete();
 
         } catch (IOException e) {
             throw new CannotLoadStorage(e);

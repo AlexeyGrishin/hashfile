@@ -6,49 +6,28 @@ import java.util.List;
 
 public class RealFiles implements Files {
     @Override
-    public String[] resolveIds(String path) {
+    public Source[] getSources(String path) {
         File file = new File(path);
-        if (file.isFile()) {
-            return new String[] {path};
+        if (file.isFile() || !file.exists()) {
+            return new Source[] {new RealSource(file, file.getName())};
         }
         else {
-            List<String> fileNames = new ArrayList<>();
-            collectFiles(new File("."), file, fileNames);
-            return fileNames.toArray(new String[fileNames.size()]);
+            List<Source> sources = new ArrayList<>();
+            collectSources(new File(path), file, sources);
+            return sources.toArray(new Source[sources.size()]);
         }
     }
 
-    private void collectFiles(File root, File dir, List<String> names) {
+    private void collectSources(File root, File dir, List<Source> sources) {
         for (File file: dir.listFiles()) {
             if (file.isDirectory()) {
-                collectFiles(root, file, names);
+                collectSources(root, file, sources);
             }
             else if (file.isFile() && file.canRead()) {
-                names.add(file.getAbsolutePath());
+                sources.add(new RealSource(file, file.toPath().relativize(root.toPath()).toString()));
             }
         }
     }
 
-    @Override
-    public String toKey(String id) {
-        return new File(id).getName();
-    }
 
-    @Override
-    public InputStream getInputStream(String id) {
-        try {
-            return new FileInputStream(id);
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);  //TODO
-        }
-    }
-
-    @Override
-    public OutputStream getOutputStream(String id) {
-        try {
-            return new FileOutputStream(id);
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        }
-    }
 }
