@@ -10,6 +10,8 @@ import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.internal.stubbing.answers.ReturnsArgumentAt;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import java.io.*;
 import java.util.Arrays;
@@ -41,6 +43,12 @@ public class CommandLineApiTest {
         when(files.getInputStream(anyString())).thenReturn(inputStream);
         when(files.getOutputStream(anyString())).thenReturn(outputStream);
         when(files.toKey(anyString())).then(new ReturnsArgumentAt(0));
+        when(files.resolveIds(anyString())).then(new Answer<Object>() {
+            @Override
+            public Object answer(InvocationOnMock invocationOnMock) throws Throwable {
+                return new String[]{(String) invocationOnMock.getArguments()[0]};
+            }
+        });
     }
 
     @Test
@@ -85,6 +93,7 @@ public class CommandLineApiTest {
     public void importFrom_withoutKey() throws FileNotFoundException, ParseException {
         processArgs("path1", "--import-from", "file1");
         verify(files).getInputStream("file1");
+        verify(files).resolveIds("file1");
         verify(files).toKey("file1");
         verify(factory).load("path1");
         verify(storageMock).saveFrom("file1", inputStream);
@@ -95,11 +104,35 @@ public class CommandLineApiTest {
     @Test
     public void importFrom_withKey() throws FileNotFoundException, ParseException {
         processArgs("path1", "--import-from", "file1", "--key", "key1");
+        verify(files).resolveIds("file1");
         verify(files).getInputStream("file1");
         verify(factory).load("path1");
         verify(storageMock).saveFrom("key1", inputStream);
         verify(storageMock).close();
         verifyNoMoreInteractions(files, factory, storageMock);
+    }
+
+    @Test
+    public void importFrom_folder_withoutKey() throws FileNotFoundException, ParseException {
+        when(files.resolveIds("folder1")).thenReturn(new String[] {"folder1/file1", "folder2/file2"});
+        processArgs("path1", "--import-from", "folder1");
+        verify(factory).load("path1");
+        verify(files).resolveIds("folder1");
+        verify(files).getInputStream("folder1/file1");
+        verify(files).getInputStream("folder1/file2");
+        verify(storageMock).saveFrom("folder1/file1", inputStream);
+        verify(storageMock).saveFrom("folder1/file2", inputStream);
+        verify(storageMock).close();
+        verifyNoMoreInteractions(files, factory, storageMock);
+    }
+
+    @Test
+    public void importFrom_folder_withKey() throws FileNotFoundException, ParseException {
+        when(files.resolveIds("folder1")).thenReturn(new String[] {"folder1/file1", "folder2/file2"});
+        processArgs("path1", "--import-from", "folder1", "--key", "key1");
+        verify(files).getInputStream("folder1/file1");
+        verify(files).getInputStream("folder1/file2");
+        //key is ignored
     }
 
     @Test

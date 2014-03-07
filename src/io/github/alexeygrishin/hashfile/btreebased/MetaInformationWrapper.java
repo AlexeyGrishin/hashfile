@@ -70,5 +70,6 @@ public class MetaInformationWrapper implements SynchronizedByteContainer {
         public int version = 0x01;
         public int blockSize;
         public int truncateMethod;
+        public int cacheSize;
     }
 }

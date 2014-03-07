@@ -1,5 +1,6 @@
 package io.github.alexeygrishin.hashfile.btreebased;
 
+import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import io.github.alexeygrishin.blockalloc.Allocator;
 import io.github.alexeygrishin.btree.*;
 import io.github.alexeygrishin.common.Pointer;
@@ -76,5 +77,16 @@ public class BTreeBasedStorage implements NamedStorage {
     public void close() {
         tree.close();
         storage.close();
+    }
+
+    @Override
+    public void cloneTo(NamedStorage storage) {
+        for (String key: tree) {
+            ByteArrayOutputStream bstream = new ByteArrayOutputStream();
+            getInto(key, bstream);
+            byte[] bytes = bstream.toByteArray();
+            storage.saveFrom(key, new ByteInputStream(bytes, bytes.length));
+        }
+
     }
 }

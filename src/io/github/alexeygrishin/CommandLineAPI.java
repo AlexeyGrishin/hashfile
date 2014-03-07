@@ -31,9 +31,11 @@ public class CommandLineAPI {
         );
         options.addOption("k", "key", true, "Provides a key to operate with");
         options.addOption("e", "export-to", true, "Extracts data to the specified file.");
-        options.addOption("i", "import-from", true, "Imports data from the specified file.");
+        options.addOption("i", "import-from", true, "Imports data from the specified file. If folder specified then all files from the folder will be imported recursively.");
         options.addOption("d", "delete", false, "Deletes data for the specified key");
         options.addOption("c", "check", false, "Checks is the data for this key exist or not");
+        options.addOption("o", "optimize", false, "Removes old data blocks, reorganizes file for less fragmentation");
+        options.addOption("p", "copy-from", true, "Copies all items from specified storage");
         boolean isHeader = true;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(this.getClass().getResourceAsStream("help.txt")))) {
             String str;
@@ -80,10 +82,16 @@ public class CommandLineAPI {
                 }
                 else if (cmd.hasOption("import-from")) {
                     String filePath = cmd.getOptionValue("import-from");
-                    if (key == null) key = files.toKey(filePath);
-                    out.print("Importing `" + key + "`...");
-                    storage.saveFrom(key, files.getInputStream(filePath));
-                    out.println("Ok!");
+                    String[] ids = files.resolveIds(filePath);
+                    if (ids.length == 1) {
+                        if (key == null) key = files.toKey(filePath);
+                        importFile(out, storage, key, filePath);
+                    }
+                    else {
+                        for (String id: ids) {
+                            importFile(out, storage, id, id);
+                        }
+                    }
                 }
                 else if (cmd.hasOption("export-to")) {
                     checkKey(key);
@@ -106,18 +114,34 @@ public class CommandLineAPI {
                     checkKey(key);
                     out.println(storage.contains(key) ? "Yes" : "No");
                 }
+                else if (cmd.hasOption("copy-from")) {
+                    NamedStorage anotherOne = factory.load(cmd.getOptionValue("copy-from"));
+                    out.print("Copying...");
+                    anotherOne.cloneTo(storage);
+                    out.println("Ok!");
+                }
                 else if (cmd.hasOption("key")) {
                     if (!storage.getInto(key, out)) {
                         out.println("<Not found>");
                     }
                 }
-                else {
+                else if (!cmd.hasOption("optimize")) {
                     showHelp();
                 }
             }
-
+            if (cmd.hasOption("optimize")) {
+                out.print("Data optimization...");
+                factory.truncate(storageName);
+                out.println("Ok!");
+            }
         }
 
+    }
+
+    private void importFile(PrintStream out, NamedStorage storage, String key, String filePath) {
+        out.print("Importing `" + key + "`...");
+        storage.saveFrom(key, files.getInputStream(filePath));
+        out.println("Ok!");
     }
 
     private void doCreate(String storageName, String options) throws ParseException {

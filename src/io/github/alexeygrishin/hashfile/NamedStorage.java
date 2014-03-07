@@ -18,4 +18,6 @@ public interface NamedStorage extends Iterable<String>, AutoCloseable {
     Iterator<String> iterator();
 
     void close();
+
+    void cloneTo(NamedStorage storage);
 }

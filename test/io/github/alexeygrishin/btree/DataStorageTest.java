@@ -62,6 +62,14 @@ public class DataStorageTest extends TestBaseWithCounter {
     }
 
     @Test
+    public void saveGetData_empty() {
+        int blockId = storage.insert("abc", str(""));
+        storage.select(blockId, out);
+        assertEquals("", str(out));
+    }
+
+
+    @Test
     public void saveGetData_samePageWithName() {
         int blockId = storage.insert("abc", str("d"));
         assertEquals("abc", storage.getFullName(blockId));

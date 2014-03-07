@@ -188,11 +188,12 @@ public class DataStorage implements DataContainer{
         int result = stream.read(page.bytes, page.dataPortionOffset, page.dataPortionLength);
         if (result == -1) {
             status = Status.EMPTY;
+            page.dataPortionLength = 0;
         }
         else if (result != page.dataPortionLength) {
             status = Status.DONE;
+            page.dataPortionLength = result;
         }
-        page.dataPortionLength = result;
         return status;
     }
 
@@ -221,7 +222,7 @@ public class DataStorage implements DataContainer{
         }
 
         public boolean hasDataPart() {
-            return dataPortionLength != 0;
+            return dataPortionOffset < bytes.length;
         }
 
         public int getNamePart(byte[] nameAsBytes, int offset) {

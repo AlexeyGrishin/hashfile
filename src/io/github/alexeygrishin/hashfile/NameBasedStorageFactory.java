@@ -8,4 +8,6 @@ public interface NameBasedStorageFactory {
     NamedStorage load(String filePath);
 
     NamedStorage create(String filePath);
+
+    void truncate(String filePath);
 }

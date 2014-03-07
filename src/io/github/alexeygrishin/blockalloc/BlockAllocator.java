@@ -27,7 +27,7 @@ public class BlockAllocator implements Allocator {
 
     @Override
     public int getBlocksCount() {
-        return (int)(byteContainer.getSize() / blockSize);
+        return (int)(byteContainer.getSize() / blockSize); //TODO: dimensions
     }
 
     private long ptr(int blockId) {
