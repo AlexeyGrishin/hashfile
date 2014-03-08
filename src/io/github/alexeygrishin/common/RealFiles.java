@@ -24,7 +24,7 @@ public class RealFiles implements Files {
                 collectSources(root, file, sources);
             }
             else if (file.isFile() && file.canRead()) {
-                sources.add(new RealSource(file, file.toPath().relativize(root.toPath()).toString()));
+                sources.add(new RealSource(file, root.toPath().relativize(file.toPath()).toString()));
             }
         }
     }
