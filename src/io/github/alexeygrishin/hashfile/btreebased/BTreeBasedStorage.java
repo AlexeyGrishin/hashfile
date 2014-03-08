@@ -9,6 +9,8 @@ import io.github.alexeygrishin.hashfile.NamedStorage;
 import java.io.*;
 import java.util.Iterator;
 
+import static io.github.alexeygrishin.common.Check.safeInt;
+
 public class BTreeBasedStorage implements NamedStorage {
 
     public static final int NAMES_CACHE_SIZE = 1024 * 1024;
@@ -20,8 +22,8 @@ public class BTreeBasedStorage implements NamedStorage {
         this.storage = new DataStorage(allocator);
         this.tree = new BTree(allocator, new TreeNamesCache(new TreeNameHelper() {
             @Override
-            public String getFullName(int dataId) {
-                return storage.getFullName(dataId);
+            public String getFullName(long dataId) {
+                return storage.getFullName(safeInt(dataId));
             }
 
             @Override
@@ -35,7 +37,7 @@ public class BTreeBasedStorage implements NamedStorage {
     public boolean getInto(String key, OutputStream stream) {
         long pointer = tree.get(key);
         if (!Pointer.isValid(pointer)) return false;
-        storage.select((int)pointer, stream);
+        storage.select(safeInt(pointer), stream);
         return true;
     }
 
@@ -49,7 +51,7 @@ public class BTreeBasedStorage implements NamedStorage {
 
             @Override
             public long updateData(long oldData) {
-                storage.update((int)oldData, stream);
+                storage.update(safeInt(oldData), stream);
                 return oldData;
             }
         });
@@ -64,7 +66,7 @@ public class BTreeBasedStorage implements NamedStorage {
     public void delete(String key) {
         long data = tree.remove(key);
         if (data != -1) {
-            storage.delete((int)data);
+            storage.delete(safeInt(data));
         }
     }
 

@@ -5,13 +5,13 @@ import io.github.alexeygrishin.common.CacheBase;
 public class TreeNamesCache implements TreeNameHelper {
 
     private TreeNameHelper wrapped;
-    private CacheBase<Integer, String> cache;
+    private CacheBase<Long, String> cache;
 
     public TreeNamesCache(final TreeNameHelper wrapped, int maxSize, int longNamesInitialCount) {
         this.wrapped = wrapped;
-        this.cache = new CacheBase<Integer, String>(maxSize, longNamesInitialCount) {
+        this.cache = new CacheBase<Long, String>(maxSize, longNamesInitialCount) {
             @Override
-            protected String getFromSource(Integer key) {
+            protected String getFromSource(Long key) {
                 return wrapped.getFullName(key);
             }
 
@@ -21,14 +21,14 @@ public class TreeNamesCache implements TreeNameHelper {
             }
 
             @Override
-            protected void free(Integer key, String element) {
+            protected void free(Long key, String element) {
                 //nothing special
             }
         };
     }
 
     @Override
-    public String getFullName(int dataId) {
+    public String getFullName(long dataId) {
         return cache.get(dataId);
     }
 

@@ -22,8 +22,9 @@ public interface Allocator {
      * @param blockId block id, >=0 and < getBlocksCount()
      * @param kls class to load data into.
      * @return object of specified class deserialized from block.
-     * @throws java.lang.IndexOutOfBoundsException TODO
-     * @throws io.github.alexeygrishin.blockalloc.serializers.SerializationException TODO
+     * @throws java.lang.IndexOutOfBoundsException if trying to read outside storage
+     * @throws io.github.alexeygrishin.blockalloc.serializers.SerializationException if cannot convert read bytes to specified class
+     * @throws io.github.alexeygrishin.bytestorage.StorageFault
      */
     <T> T get(int blockId, Class<T> kls);
 
@@ -31,8 +32,8 @@ public interface Allocator {
      * Saves object to the block with specified id.
      * @param blockId block id, >=0 and < getBlocksCount()
      * @param data object to store
-     * @throws java.lang.IndexOutOfBoundsException TODO
-     * @throws io.github.alexeygrishin.blockalloc.serializers.SerializationException TODO
+     * @throws java.lang.IndexOutOfBoundsException if trying to write outsie storage
+     * @throws io.github.alexeygrishin.blockalloc.serializers.SerializationException if cannot convert object to bytes
      **/
     void saveModifications(int blockId, Object data);
 

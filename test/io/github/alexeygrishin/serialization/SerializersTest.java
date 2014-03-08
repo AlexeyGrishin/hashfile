@@ -52,15 +52,11 @@ public class SerializersTest {
         s = serializer.load(buffer);
         assertEquals("test", s.structs[0].name);
     }
-    
-    @Test
-    //TODO: no primitives
+
+    @Test(expected = SerializationException.class)
     public void structWithArrayOfPrimitives() {
         Serializer<StructWithPrimitiveArray> serializer = Serializers.INSTANCE.get(StructWithPrimitiveArray.class);
         StructWithPrimitiveArray s = serializer.load(buffer);
-        assertEquals(25, s.array.length);
-        serializer.save(buffer, s);
-        //ok, no error
     }
 
     @Test
@@ -78,7 +74,6 @@ public class SerializersTest {
         StructWithByteArray struct = serializer.load(buffer);
         struct.bytes= new byte[100];
         serializer.save(buffer, struct);
-        //ok, no error
     }
 
     @Test
@@ -94,6 +89,18 @@ public class SerializersTest {
     public void structSmallForArray() {
         Serializer<SmallStructForArray> serializer = Serializers.INSTANCE.get(SmallStructForArray.class);
         SmallStructForArray ar = serializer.load(buffer);
+    }
+
+    @Test(expected = SerializationException.class)
+    public void structDefinedSizeMismatch() {
+        Serializer<StructSizeMismatch> serializer = Serializers.INSTANCE.get(StructSizeMismatch.class);
+    }
+
+    @Test
+    public void structDefinedSizeExactMatch() {
+        Serializer<StructSizeExactMatch> serializer = Serializers.INSTANCE.get(StructSizeExactMatch.class);
+        serializer.load(buffer);
+        //ok
     }
 
     @Limited(size = 100)
@@ -113,7 +120,7 @@ public class SerializersTest {
 
     @Limited(size = 100)
     public static class StructWithPrimitiveArray {
-        public Integer[] array;
+        public int[] array;
     }
 
     @Limited(size = 100)
@@ -125,6 +132,18 @@ public class SerializersTest {
     @Limited(size = 3)
     public static class SmallStructForArray {
         public Integer[] array;
+    }
+
+    @Limited(size = 7)
+    public static class StructSizeMismatch {
+        public Integer val1;
+        public Integer val2;
+    }
+
+    @Limited(size = 8)
+    public static class StructSizeExactMatch {
+        public Integer val1;
+        public Integer val2;
     }
 
     public static class StructWithSerializer implements Serializer<StructWithSerializer> {

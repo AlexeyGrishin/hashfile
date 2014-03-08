@@ -5,7 +5,7 @@ import io.github.alexeygrishin.btree.BTree;
 import io.github.alexeygrishin.btree.TreeNameHelper;
 import io.github.alexeygrishin.common.Pointer;
 
-@Limited(size = 256)
+@Limited(size = BTree.ENTRY_SIZE)
 public class TreeEntry {
     public int hash;
     public int childPtr;

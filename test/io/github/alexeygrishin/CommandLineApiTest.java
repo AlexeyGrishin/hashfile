@@ -170,6 +170,26 @@ public class CommandLineApiTest {
         verify(storageMock).close();
         verifyNoMoreInteractions(files, factory, storageMock);
     }
+
+    @Test
+    public void truncate_standalone() throws FileNotFoundException, ParseException {
+        processArgs("path1", "--optimize");
+        verify(factory).load("path1");
+        verify(factory).truncate("path1");
+        verify(storageMock).close();
+        verifyNoMoreInteractions(files, factory, storageMock);
+    }
+
+    @Test
+    public void truncate_delete() throws FileNotFoundException, ParseException {
+        processArgs("path1", "--key", "key1", "--delete", "--optimize");
+        verify(factory).load("path1");
+        verify(storageMock).delete("key1");
+        verify(storageMock).close();
+        verify(factory).truncate("path1");
+        verifyNoMoreInteractions(files, factory, storageMock);
+    }
+
     //TODO: InvalidSyntaxException,
 
     private void assertOutput(String expectation, String... params) throws FileNotFoundException, ParseException {

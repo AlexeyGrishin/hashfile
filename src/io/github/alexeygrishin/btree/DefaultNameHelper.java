@@ -2,7 +2,7 @@ package io.github.alexeygrishin.btree;
 
 public class DefaultNameHelper implements TreeNameHelper {
     @Override
-    public String getFullName(int dataId) {
+    public String getFullName(long dataId) {
         throw new UnsupportedOperationException("There is no storage defined for long names");
     }
 

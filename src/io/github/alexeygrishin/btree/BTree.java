@@ -18,6 +18,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class BTree implements Iterable<String>, AutoCloseable {
 
+    public static final int ENTRY_SIZE = 256;
     public static final int KEY_PART_SIZE = 220;
     public static final int KEY_PART_LENGTH = KEY_PART_SIZE / 2;
     private final Allocator allocator;
@@ -43,22 +44,23 @@ public class BTree implements Iterable<String>, AutoCloseable {
         this(allocator, new DefaultNameHelper());
     }
 
-    //TODO: test exceptions
     public BTree(Allocator allocator, TreeNameHelper helper) {
         this.allocator = allocator;
         this.helper = helper;
         int size = Serializers.INSTANCE.getSize(TreeEntry.class);
-        if (allocator.getBlockSize() % size != 0) {
+        int pageInfoSize = Serializers.INSTANCE.getSize(PageInfo.class);
+        int sizeForEntries = allocator.getBlockSize() - pageInfoSize;
+        if (sizeForEntries % size != 0) {
             throw new IllegalArgumentException("Block shall contain integer amount of entries (entry size = " + size + ", block size = " + allocator.getBlockSize());
         }
-        maxAmount = allocator.getBlockSize() / size;
-        if (maxAmount % 2 != 0) {
+        maxAmount = sizeForEntries / size;
+        if (maxAmount % 2 != 1) {
             throw new IllegalArgumentException("Block shall contain even nmber of entries (now " + maxAmount + ")");
         }
-        if (maxAmount < 4) {
-            throw new IllegalArgumentException("Block shall have at least " + (size * 4) + "bytes (to contain meta-data + at least 3 entries)");
+        if (maxAmount < 3) {
+            throw new IllegalArgumentException("Block shall have at least " + (size*3 + pageInfoSize) + ": " + (size * 3) + "bytes (data) + " + pageInfoSize + " bytes (meta)");
         }
-        t = maxAmount / 2;
+        t = (maxAmount+1) / 2;
         minAmount = t - 1;
         maxAmount = 2*t - 1;
         assert((maxAmount - 1) / 2 == minAmount);
@@ -107,9 +109,9 @@ public class BTree implements Iterable<String>, AutoCloseable {
         return entry != null ? entry.data : Pointer.NULL_PTR;
     }
 
-    public int size() {           //TODO
+    public long size() {
         try (Locker ignore = readLock()) {
-            return (int)totalCount;
+            return totalCount;
         }
     }
 
@@ -464,8 +466,8 @@ public class BTree implements Iterable<String>, AutoCloseable {
         return result;
     }
 
-    private String getWholeKey(TreeEntry entry) {                           //TODO:cast
-        return entry.isWholeKey() ? entry.keyPart : helper.getFullName((int)entry.data);
+    private String getWholeKey(TreeEntry entry) {
+        return entry.isWholeKey() ? entry.keyPart : helper.getFullName(entry.data);
     }
 
 

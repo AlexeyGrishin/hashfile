@@ -6,6 +6,8 @@ import io.github.alexeygrishin.blockalloc.serializers.Serializers;
 
 import java.nio.ByteBuffer;
 
+import static io.github.alexeygrishin.common.Check.safeInt;
+
 /**
  * Basic implementation based on {@link io.github.alexeygrishin.bytestorage.SynchronizedByteContainer}.
  */
@@ -27,15 +29,15 @@ public class BlockAllocator implements Allocator {
 
     @Override
     public int getBlocksCount() {
-        return (int)(byteContainer.getSize() / blockSize); //TODO: dimensions
+        return safeInt(byteContainer.getSize() / blockSize);
     }
 
     private long ptr(int blockId) {
-        return blockId * blockSize;
+        return (long)blockId * blockSize;
     }
 
     private int blockId(long ptr) {
-        return (int)(ptr / blockSize);
+        return safeInt(ptr / blockSize);
     }
 
     @Override

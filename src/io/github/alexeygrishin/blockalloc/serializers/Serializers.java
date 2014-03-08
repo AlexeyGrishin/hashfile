@@ -10,16 +10,25 @@ import java.util.Map;
  * 2. Have constructor without params
  * 3. Have at least one public field - only public non-static non-transient fields will be serialized
  * 4. For String fields there shall be {@link io.github.alexeygrishin.blockalloc.serializers.Limited} anotation with max size
- * 5. There shall be zero or one array of bytes or other classes
- * Also such class may have {@link io.github.alexeygrishin.blockalloc.serializers.Limited} annotation to explicitly define its class.
+ * 5. There shall be zero or one array of bytes or other classes (not primitives)
+ * Also such class may have {@link io.github.alexeygrishin.blockalloc.serializers.Limited} annotation to explicitly define its size.
  *
  * Example:
  * <code>
+ *     //Will take 100 bytes for this struct - 4 for int, 20 for string and 76 padding
  *     @Limited(length = 100);
  *     class Struct1 {
  *         public int value1;
  *         @Limited(length = 20);
  *         public String name;
+ *     }
+ *
+ *     //Will take 604 bytes for this struct - 4 for int and 600 for array.
+ *     //Array will **always** have 6 elements, use additional field (like `count`) to store size.
+ *     @Limited(length = 604);
+ *     class Struct2 {
+ *         public int count;
+ *         public Struct1[] elements;
  *     }
  *     ...
  *     Struct s = Serializers.INSTANCE.get(Struct1.class).load(byteBuffer);

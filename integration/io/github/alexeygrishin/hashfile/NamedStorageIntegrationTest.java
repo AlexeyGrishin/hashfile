@@ -5,6 +5,7 @@ import io.github.alexeygrishin.hashfile.btreebased.BTreeBasedFactory;
 import io.github.alexeygrishin.tool.ByteCounter;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -16,17 +17,63 @@ import static org.junit.Assert.*;
 
 public class NamedStorageIntegrationTest {
 
+    private final static String TEMP_FILE = "temp1";
+
+
+    private static  void deleteTempFile() {
+        File file = new File(TEMP_FILE);
+        if (file.exists()) {
+            if (!file.delete()){
+                throw new RuntimeException("Cannot delete file " + TEMP_FILE);
+            }
+        }
+    }
+
+    public static class Put4M {
+        public static final int HOW_MANY = 4000000;
+        protected NamedStorage storage;
+
+
+        @Before
+        public void setup() {
+            deleteTempFile();
+            storage = new BTreeBasedFactory().create(TEMP_FILE, 1, 1000, KeyTruncateMethod.LEADING);
+        }
+
+        @Test
+        @Ignore
+        //TODO
+        public void add_4M_andIterate() {
+            for (long i = 0; i < HOW_MANY; i++) {
+                storage.saveFrom(randomString(10),generateData(1));
+                if (i % 100000 == 0) {
+                    System.out.println((i*100 / HOW_MANY) + "%");
+                }
+            }
+            int counter = 0;
+            for (String ctr: storage) {
+                counter++;
+            }
+            assertEquals(HOW_MANY, counter);
+        }
+
+        @After
+        public void teardown() {
+            if (storage != null) storage.close();
+            storage = null;
+            deleteTempFile();
+        }
+
+    }
 
     public static abstract class Base {
         protected abstract int getKeyLen();
         protected abstract KeyTruncateMethod getTruncateMethod();
 
         protected abstract int getDataLen();
-        private NamedStorage storage;
+        protected NamedStorage storage;
 
 
-
-        private final static String TEMP_FILE = "temp1";
 
         @Before
         public void setup() {
@@ -34,15 +81,6 @@ public class NamedStorageIntegrationTest {
             storage = new BTreeBasedFactory().create(TEMP_FILE, null, null, getTruncateMethod());
         }
 
-
-        private void deleteTempFile() {
-            File file = new File(TEMP_FILE);
-            if (file.exists()) {
-                if (!file.delete()){
-                    throw new RuntimeException("Cannot delete file " + TEMP_FILE);
-                }
-            }
-        }
 
         @After
         public void teardown() {
@@ -116,7 +154,6 @@ public class NamedStorageIntegrationTest {
             storage = new BTreeBasedFactory().load(TEMP_FILE);
             assertTrue(storage.contains("01"));
         }
-
 
 
     }

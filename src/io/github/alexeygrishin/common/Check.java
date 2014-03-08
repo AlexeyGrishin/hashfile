@@ -15,4 +15,11 @@ public class Check {
         return numLike;
     }
 
+    public static int safeInt(long val) {
+        if (val > Integer.MAX_VALUE || val < Integer.MIN_VALUE) {
+            throw new IllegalArgumentException("Cannot cast " + val + " to int");
+        }
+        return (int)val;
+    }
+
 }

@@ -12,6 +12,9 @@ class ArraySerializer implements Serializer<Object[]> {
 
     public ArraySerializer(Class<?> type, int maxSize) {
         this.innerClass = type.getComponentType();
+        if (innerClass.isPrimitive()) {
+            throw new SerializationException("Arrays of primitive types (except byte) are not supported");
+        }
         innerSerializer = Serializers.INSTANCE.get(innerClass);
         int structSize = innerSerializer.getSize();
         this.count = maxSize / structSize;

@@ -85,7 +85,8 @@ public class LockMap<T> {
                     }
                 }
                 else {
-                    //TODO: ? shall never happen
+                    //shall never happen.
+                    //anyway lock is gone, so may ignore
                 }
             }
         }

@@ -6,7 +6,10 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-//TODO: tests on edge cases. Probably more examples on serialization
+/**
+ * Basic serializer for "struct" classes (with empty constructor and public fields).
+ * See {@link Serializers} for more information.
+ */
 class StructSerializer<T> implements Serializer<T> {
 
     private Class<T> kls;
@@ -48,7 +51,7 @@ class StructSerializer<T> implements Serializer<T> {
         }
         if (requiredSize != null) {
             if (requiredSize < size) {
-                throw new IllegalStateException("Class " + kls + " has real size of " + size + "bytes, but @Limited annotation declares only " + requiredSize);
+                throw new SerializationException("Class " + kls + " has real size of " + size + "bytes, but @Limited annotation declares only " + requiredSize);
             }
             if (unlimitedArrayField != null) {
                 Serializer serializer = Serializers.INSTANCE.get(unlimitedArrayField.getType(), requiredSize - size);
@@ -59,10 +62,10 @@ class StructSerializer<T> implements Serializer<T> {
             size = requiredSize;
         }
         else if (unlimitedArrayField != null) {
-            throw new IllegalStateException("Class " + kls + " has array field, but does not have @Limited annotation, so serializer cannot define its size");
+            throw new SerializationException("Class " + kls + " has array field, but does not have @Limited annotation, so serializer cannot define its size");
         }
         if (fields.isEmpty()) {
-            throw new IllegalArgumentException("Class " + kls + " does not have any field to serialize. Probably fields are not defined as public");
+            throw new SerializationException("Class " + kls + " does not have any field to serialize. Probably fields are not defined as public");
         }
     }
 

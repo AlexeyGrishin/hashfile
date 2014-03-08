@@ -26,18 +26,6 @@ public class TreeHelper {
         return (t*2)*256;
     }
 
-    private static void assertPut(BTree tree, String... values) {
-        int size = tree.size();
-        List<String> prevKeys = iteratorToList(tree);
-        for (String key: values) {
-            tree.put(key, 1);
-            prevKeys.add(key);
-        }
-        List<String> newKeys = iteratorToList(tree);
-        assertListsEqual(prevKeys, newKeys);
-        assertEquals(size + values.length, tree.size());
-    }
-
     public static void assertKeys(BTree tree, String... expectedKeys) {
         List<String> expected = new ArrayList<>(Arrays.asList(expectedKeys));
         List<String> actual = iteratorToList(tree);

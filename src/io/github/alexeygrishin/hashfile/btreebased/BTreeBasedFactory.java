@@ -30,7 +30,6 @@ public class BTreeBasedFactory implements NameBasedStorageFactory {
         int blockSize = 1024 * positive(notNull(blockSizeK, DEFAULT_BLOCK_SIZE), "blockSize");
         cacheLimit = positive(notNull(cacheLimit, DEFAULT_CACHE_SIZE / blockSize), "cacheLimit");
         part = notNull(part, KeyTruncateMethod.LEADING);
-        //TODO: check block ize (shall be > 256 at least);
         return createStorage(file, blockSize, cacheLimit, part);
     }
 
