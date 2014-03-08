@@ -29,7 +29,8 @@ public class CommandLineAPI {
         options.addOption(newOpt);
         options.addOption("k", "key", true, "Provides a key to operate with. Without other options just prints corresponding data to STDOUT");
         options.addOption("e", "export-to", true, "Extracts data to the specified file (requires --key option)");
-        options.addOption("i", "import-from", true, "Imports data from the specified file (requires --key option). If folder specified then all files from the folder will be imported recursively.");
+        options.addOption("i", "import-from", true, "Imports data from the specified file/folder. If --key option is not specified then file's name is used as key. \n" +
+                "If folder specified then all files from the folder will be imported recursively using their relative paths as keys. --key option is ignored in this case.");
         options.addOption("d", "delete", false, "Deletes data for the specified key (requires --key option)");
         options.addOption("c", "check", false, "Checks is the data for this key exist or not (requires --key option)");
         options.addOption("o", "optimize", false, "Removes old data blocks, reorganizes file for less fragmentation");
@@ -91,6 +92,9 @@ public class CommandLineAPI {
                         importFile(out, storage, key, sources[0]);
                     }
                     else {
+                        if (key != null) {
+                            throw new InvalidSyntax("When importing from folder the file paths are used as keys so --key value is ignored");
+                        }
                         for (Source src: sources) {
                             importFile(out, storage, src.toKey(), src);
                         }
@@ -161,10 +165,15 @@ public class CommandLineAPI {
                         cacheSize = Integer.parseInt(keyValue[1]);
                         break;
                     case "truncate":
-                        method = KeyTruncateMethod.valueOf(keyValue[1].toUpperCase());
+                        try {
+                            method = KeyTruncateMethod.valueOf(keyValue[1].toUpperCase());
+                        }
+                        catch (IllegalArgumentException e) {
+                            throw new InvalidSyntax("Unknown truncate method `" + keyValue[1] + "`. Supported are `leading` and `trailing`");
+                        }
                         break;
                     default:
-                        throw new ParseException("Unknown option `" + keyValue[0] + "` - the supported ones are `block`, `cache` and `truncate`");
+                        throw new InvalidSyntax("Unknown option `" + keyValue[0] + "` - the supported ones are `block`, `cache` and `truncate`");
                 }
             }
         }
@@ -173,7 +182,7 @@ public class CommandLineAPI {
 
     private void checkKey(String key) throws ParseException {
         if (key == null) {
-            throw new ParseException("Options `--export-to`, `--check`, `--delete` require `--key` option as well");
+            throw new InvalidSyntax("Options `--export-to`, `--check`, `--delete` require `--key` option as well");
         }
     }
 
@@ -188,6 +197,10 @@ public class CommandLineAPI {
         try {
             CommandLineAPI api = new CommandLineAPI(new BTreeBasedFactory(), new RealFiles());
             api.process(args, System.out);
+        }
+        catch (InvalidSyntax e) {
+            System.err.println(e.getMessage());
+            System.exit(1);
         }
         catch (Exception e) {
             System.err.println(e.getMessage());

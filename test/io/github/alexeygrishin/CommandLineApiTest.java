@@ -87,9 +87,15 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void create_truncate() throws FileNotFoundException, ParseException {
+    public void create_truncate_trailing() throws FileNotFoundException, ParseException {
         assertOutput(lines("Done"), "path1", "--new", "cache=4,truncate=trailing");
         verify(factory).create("path1", null, 4, KeyTruncateMethod.TRAILING);
+    }
+
+    @Test
+    public void create_truncate_leading() throws FileNotFoundException, ParseException {
+        assertOutput(lines("Done"), "path1", "--new", "cache=4,truncate=leading");
+        verify(factory).create("path1", null, 4, KeyTruncateMethod.LEADING);
     }
 
     @Test
@@ -114,7 +120,6 @@ public class CommandLineApiTest {
         verify(storageMock).close();
         verifyNoMoreInteractions(files, factory, source1, storageMock);
     }
-    //TODO: check invalid values
 
     @Test
     public void importFrom_folder_withoutKey() throws FileNotFoundException, ParseException {
@@ -132,13 +137,10 @@ public class CommandLineApiTest {
         verifyNoMoreInteractions(files, factory, source1, storageMock);
     }
 
-    @Test
+    @Test(expected = InvalidSyntax.class)
     public void importFrom_folder_withKey() throws FileNotFoundException, ParseException {
         when(files.getSources("folder1")).thenReturn(new Source[] {source1, source2});
         processArgs("path1", "--import-from", "folder1", "--key", "key1");
-        verify(storageMock).saveFrom(DEFAULT_KEY, inputStream);
-        verify(storageMock).saveFrom(DEFAULT_KEY_2, inputStream);
-        //key is ignored
     }
 
     @Test
@@ -190,7 +192,30 @@ public class CommandLineApiTest {
         verifyNoMoreInteractions(files, factory, storageMock);
     }
 
-    //TODO: InvalidSyntaxException,
+    @Test(expected = InvalidSyntax.class)
+    public void exportTo_withoutKey() throws Exception {
+        processArgs("path1", "--export-to", "file1");
+    }
+
+    @Test(expected = InvalidSyntax.class)
+    public void check_withoutKey() throws Exception {
+        processArgs("path1", "--check");
+    }
+
+    @Test(expected = InvalidSyntax.class)
+    public void delete_withotKey() throws Exception {
+        processArgs("path1", "--delete");
+    }
+
+    @Test(expected = InvalidSyntax.class)
+    public void new_unknownOption() throws Exception {
+        processArgs("path1", "--new", "unknown=3");
+    }
+
+    @Test(expected = InvalidSyntax.class)
+    public void new_truncateInvalid() throws FileNotFoundException, ParseException {
+        processArgs("path1", "--new", "truncate=leadin");
+    }
 
     private void assertOutput(String expectation, String... params) throws FileNotFoundException, ParseException {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();

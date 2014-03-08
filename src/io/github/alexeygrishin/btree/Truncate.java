@@ -2,7 +2,6 @@ package io.github.alexeygrishin.btree;
 
 public class Truncate {
 
-    //TODO: test
     public static String leading(String str, int maxLen) {
         return str.length() <= maxLen ? str : str.substring(0, maxLen);
     }
