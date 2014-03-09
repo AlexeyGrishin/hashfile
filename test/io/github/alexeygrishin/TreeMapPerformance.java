@@ -55,7 +55,7 @@ public class TreeMapPerformance {
             throw new RuntimeException("Cannot delete temp file");
         }
         Counter ctr = new Counter(new FileBytesContainer(new RandomAccessFile("temp1", "rw").getChannel()));
-        Allocator allocator = new BlockAllocator(ctr, blockSize);
+        BlockAllocator allocator = new BlockAllocator(ctr, blockSize);
         storage = new Cache(allocator, cacheLimit);
         out.println("Tree block = " + blockSize + " cache = " + cacheLimit);
         out.println("N, Put time, Put reads, Put writes, Get time, Get reads, Get writes");

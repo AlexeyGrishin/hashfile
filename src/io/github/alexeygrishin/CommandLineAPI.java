@@ -24,17 +24,19 @@ public class CommandLineAPI {
         this.factory = factory;
         this.files = files;
         options.addOption("l", "list", false, "Shows all keys");
-        Option newOpt = new Option("n", "new", true,"Creates new storage with provided options: [page=1024,][cache=1000,][truncate=trailing|leading]");
+        Option newOpt = new Option("n", "new", true,"Creates new storage with provided options: [page=1024,][cache=64,][truncate=trailing|leading]");
         newOpt.setOptionalArg(true);
         options.addOption(newOpt);
         options.addOption("k", "key", true, "Provides a key to operate with. Without other options just prints corresponding data to STDOUT");
         options.addOption("e", "export-to", true, "Extracts data to the specified file (requires --key option)");
         options.addOption("i", "import-from", true, "Imports data from the specified file/folder. If --key option is not specified then file's name is used as key. \n" +
-                "If folder specified then all files from the folder will be imported recursively using their relative paths as keys. --key option is ignored in this case.");
+                "If folder specified then all files from the folder will be imported recursively using their relative paths as keys. --key option is ignored in this case.\n" +
+                "If data for this key was already stored then it will be overwritten with new data.");
         options.addOption("d", "delete", false, "Deletes data for the specified key (requires --key option)");
         options.addOption("c", "check", false, "Checks is the data for this key exist or not (requires --key option)");
         options.addOption("o", "optimize", false, "Removes old data blocks, reorganizes file for less fragmentation");
         options.addOption("p", "copy-from", true, "Copies all items from specified storage");
+        options.addOption("f", "info", false, "Shows storage info");
         readHelpHeaderFooter();
     }
 
@@ -69,6 +71,9 @@ public class CommandLineAPI {
         if (cmd.hasOption("new")) {
             doCreate(storageName, cmd.getOptionValue("new"));
             out.println("Done");
+        }
+        else if (cmd.hasOption("info")) {
+            factory.printInfo(storageName, out);
         }
         else {
             try (NamedStorage storage = factory.load(storageName)) {

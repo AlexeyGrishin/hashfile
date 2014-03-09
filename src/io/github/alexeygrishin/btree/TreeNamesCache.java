@@ -16,7 +16,7 @@ public class TreeNamesCache implements TreeNameHelper {
             }
 
             @Override
-            protected int getSize(String element) {
+            protected int getSize(Long key, String element) {
                 return element.length() * 2;
             }
 

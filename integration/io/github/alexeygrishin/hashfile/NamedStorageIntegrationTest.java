@@ -31,23 +31,28 @@ public class NamedStorageIntegrationTest {
 
     public static class Put4M {
         public static final int HOW_MANY = 4000000;
+        public static final int TIMEOUT_4M = 1000 * 60 * 3;
         protected NamedStorage storage;
 
 
         @Before
         public void setup() {
             deleteTempFile();
-            storage = new BTreeBasedFactory().create(TEMP_FILE, 1, 1000, KeyTruncateMethod.LEADING);
+            storage = new BTreeBasedFactory().create(TEMP_FILE, 1, 64, KeyTruncateMethod.LEADING);
         }
 
-        @Test
+        @Test(timeout = TIMEOUT_4M)
         @Ignore
-        //TODO
+        //TODO: replace with performance test
         public void add_4M_andIterate() {
+            long now = System.nanoTime();
             for (long i = 0; i < HOW_MANY; i++) {
                 storage.saveFrom(randomString(10),generateData(1));
                 if (i % 100000 == 0) {
-                    System.out.println((i*100 / HOW_MANY) + "%");
+                    long now2 = System.nanoTime();
+                    long diff = now2 - now;
+                    System.out.println((i*100 / HOW_MANY) + "%\t" + diff);
+                    now = now2;
                 }
             }
             int counter = 0;

@@ -11,6 +11,13 @@ import java.util.Iterator;
 
 import static io.github.alexeygrishin.common.Check.safeInt;
 
+/**
+ * Named storage based on B-Tree. B-tree is used to quickly find/insert/delete data by name.
+ *
+ * May use different storages for B-tree and data, may use the same. But it is recommented that
+ * block size fo B-tree shall be at least 1MB, so you may use {@link io.github.alexeygrishin.blockalloc.MultiBlockAllocator}
+ * over allocator with smaller block size.
+ */
 public class BTreeBasedStorage implements NamedStorage {
 
     public static final int NAMES_CACHE_SIZE = 1024 * 1024;
@@ -18,9 +25,15 @@ public class BTreeBasedStorage implements NamedStorage {
     private BTree tree;
     private DataStorage storage;
 
-    public BTreeBasedStorage(Allocator allocator, final KeyTruncateMethod part) {
-        this.storage = new DataStorage(allocator);
-        this.tree = new BTree(allocator, new TreeNamesCache(new TreeNameHelper() {
+    /**
+     * Creates storage
+     * @param treeAllocator allocator for B-Tree data, block size shall be >> 256 bytes
+     * @param dataAllocator allocator for user data, block size shall be ~ average data size. May be same as treeAllocator.
+     * @param truncateMethod how to truncate long keys for comparison
+     */
+    public BTreeBasedStorage(Allocator treeAllocator, Allocator dataAllocator, final KeyTruncateMethod truncateMethod) {
+        this.storage = new DataStorage(dataAllocator);
+        this.tree = new BTree(treeAllocator, new TreeNamesCache(new TreeNameHelper() {
             @Override
             public String getFullName(long dataId) {
                 return storage.getFullName(safeInt(dataId));
@@ -28,7 +41,7 @@ public class BTreeBasedStorage implements NamedStorage {
 
             @Override
             public String truncate(String fullName, int targetLen) {
-                return Truncate.part(fullName, targetLen, part);
+                return Truncate.part(fullName, targetLen, truncateMethod);
             }
         }, NAMES_CACHE_SIZE, NAMES_CACHE_INITIAL_COUNT));
     }

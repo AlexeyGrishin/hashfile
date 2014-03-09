@@ -36,7 +36,7 @@ public abstract class CacheBase<K, T> {
     }
 
     private void addToCache(K key, T element) {
-        int elementSize = getSize(element);
+        int elementSize = getSize(key, element);
         if (isCacheFull()) {
             Iterator<Map.Entry<K, T>> iter = map.entrySet().iterator();
             Map.Entry<K, T> oldPair = iter.next();
@@ -86,10 +86,12 @@ public abstract class CacheBase<K, T> {
     protected abstract T getFromSource(K key);
 
     /**
+     *
+     * @param key
      * @param element
      * @return element's size in bytes
      */
-    protected abstract int getSize(T element);
+    protected abstract int getSize(K key, T element);
 
     /**
      * Called when cache removes element from itself due to cache fullness.

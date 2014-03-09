@@ -4,6 +4,15 @@ Operates with name-based storage stored in single file specified as first argume
 
 <options>
 
+Examples
+---------------
+> java -jar hashfile.jar new_db
+> java -jar hashfile.jar new_db --import-from data.txt
+> java -jar hashfile.jar new_db --import-from data2.txt --key hello
+> java -jar hashfile.jar new_db --export-to copy.txt --key data.txt
+> java -jar hashfile.jar new_db --delete --key hello --optimize
+> java -jar hashfile.jar new_db --list
+
 Notes
 ----------------
 * Keys are case-sensitive
@@ -25,13 +34,11 @@ Creation
 ----------------
 When creating new storage with --new you may specify the following options separated by comma:
 
-  block=<size>          Defines the data block size, in KB.
-                        Larger means faster operations, smaller means smaller storage file size.
-                        Default is 1024 ( ==1MB)
-  cache=<limit>         Defines cache limit, in blocks.
+  block=<size>          Defines the data block size, in KB. Select it closer to the average data size.
+                        Default is 4 ( == 4KB)
+  cache=<size>          Defines cache size, in MB.
                         Larger means faster operations, smaller means smaller memory usage.
-                        Default depends on block size and is defined to use 64MB of memory (=64 cached items for 1MB
-                        block)
+                        Default is 64 ( == 64MB)
   truncate=<method>     For long keys storage first compares some limited parts of key - first or last N characters.
                         This method defines which characters will be used. Possible values are:
                         * leading - to get first characters. Good for names.

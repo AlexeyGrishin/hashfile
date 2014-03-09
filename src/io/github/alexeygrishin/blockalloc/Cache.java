@@ -2,39 +2,35 @@ package io.github.alexeygrishin.blockalloc;
 
 import io.github.alexeygrishin.common.CacheBase;
 
+import static io.github.alexeygrishin.common.Check.safeInt;
+
 /**
  * Caching decorator for any allocator. Keeps recently accessed blocks in memory. Also keep all changes to blocks
  * and passes them to decorated allocator if cache is full and some changed element need to be moved out from cache,
  * or when {@link #close()} or {@link #reset()} are called
  */
-public class Cache implements Allocator {
-    private final Allocator inner;
+public class Cache implements RandomAccessAllocator {
+    private final RandomAccessAllocator inner;
     private CacheBase<CacheKey, CacheEntry> cache;
 
-    public Cache(final Allocator inner, final int maxCacheLength) {
+    public Cache(final RandomAccessAllocator inner, final long maxCacheSize) {
         this.inner = inner;
-        long maxCacheSize = (long)maxCacheLength * inner.getBlockSize();
-        this.cache = new CacheBase<CacheKey, CacheEntry>(maxCacheSize, maxCacheLength*2) {
-
-            @Override
-            protected boolean isCacheLimitReached(int cachedElements) {
-                return cachedElements >= maxCacheLength;
-            }
+        this.cache = new CacheBase<CacheKey, CacheEntry>(maxCacheSize, safeInt(maxCacheSize / inner.getBlockSize())) {
 
             @Override
             protected CacheEntry getFromSource(CacheKey key) {
-                return new CacheEntry(inner.get(key.blockId, key.kls), false);
+                return new CacheEntry(inner.get(key.blockId, key.kls, key.count), false);
             }
 
             @Override
-            protected int getSize(CacheEntry element) {
-                return inner.getBlockSize();
+            protected int getSize(CacheKey key, CacheEntry element) {
+                return inner.getBlockSize() * key.count;
             }
 
             @Override
             protected void free(CacheKey key, CacheEntry element) {
                 if (element.openedForWrite) {
-                    inner.saveModifications(key.blockId, element.block);
+                    inner.saveModifications(key.blockId, element.block, key.count);
                 }
             }
         };
@@ -71,6 +67,21 @@ public class Cache implements Allocator {
     }
 
     @Override
+    public int allocate(int blocks) {
+        return inner.allocate(blocks);
+    }
+
+    @Override
+    public <T> T get(int blockId, Class<T> kls, int blocks) {
+        return kls.cast(cache.get(new CacheKey(blockId, kls, blocks)).block);
+    }
+
+    @Override
+    public void saveModifications(int blockId, Object data, int blocks) {
+        cache.put(new CacheKey(blockId, data.getClass(), blocks), CacheEntry.write(data));
+    }
+
+    @Override
     public <T> BlockToModify<T> getToModify(int blockId, Class<T> kls) {
         CacheEntry entry = cache.get(new CacheKey(blockId, kls));
         entry.openedForWrite = true;
@@ -92,13 +103,24 @@ public class Cache implements Allocator {
         cache.reset();
     }
 
-    static class CacheKey {
+
+
+
+    class CacheKey {
         private int blockId;
         private Class<?> kls;
+        private int count;
+
+        CacheKey(int blockId, Class<?> kls, int count) {
+            this.blockId = blockId;
+            this.kls = kls;
+            this.count = count;
+        }
 
         CacheKey(int blockId, Class<?> kls) {
             this.blockId = blockId;
             this.kls = kls;
+            this.count = 1;
         }
 
         @Override
@@ -109,6 +131,7 @@ public class Cache implements Allocator {
             CacheKey cacheKey = (CacheKey) o;
 
             if (blockId != cacheKey.blockId) return false;
+            if (count != cacheKey.count) return false;
             if (!kls.equals(cacheKey.kls)) return false;
 
             return true;
@@ -117,13 +140,14 @@ public class Cache implements Allocator {
         @Override
         public int hashCode() {
             int result = blockId;
+            result = 31 * result + count;
             result = 31 * result + kls.hashCode();
             return result;
         }
 
         @Override
         public String toString() {
-            return blockId + "(as " + kls.getSimpleName() + ")";
+            return blockId + "x" + count + "(as " + kls.getSimpleName() + ")";
         }
     }
 

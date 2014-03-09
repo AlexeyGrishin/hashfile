@@ -7,6 +7,7 @@ import io.github.alexeygrishin.btree.blocks.Page;
 import io.github.alexeygrishin.btree.blocks.PageInfo;
 import io.github.alexeygrishin.btree.blocks.TreeEntry;
 import io.github.alexeygrishin.btree.blocks.TreeInfo;
+import io.github.alexeygrishin.common.Check;
 import io.github.alexeygrishin.common.Locker;
 import io.github.alexeygrishin.common.Pointer;
 
@@ -15,7 +16,22 @@ import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-
+/**
+ * Implements B-Tree on byte blocks of identical size. Operates with 256-bytes entries so block size shall be big enough
+ * to include tens-hundreds of records for faster operations.
+ *
+ * Each tree entry contains the following:
+ * - key's hash
+ * - key's part (110 characters)
+ * - data pointer
+ *
+ * Comparison is performed this way: first hashes are compared, then key parts and only then (if all identical) the whole key
+ * is obtained from external storage.
+ *
+ * Search/Deletion/Insertion use binary search so these operations take ln(block_size)*ln(n).
+ * Iteration takes n and order is not defined.
+ *
+ */
 public class BTree implements Iterable<String>, AutoCloseable {
 
     public static final int ENTRY_SIZE = 256;
@@ -96,6 +112,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     public long remove(String key) {
+        Check.notNull(key);
         TreeEntry entry;
         try (Locker ignore = writeLock()) {
             entry = findAndDelete(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));
@@ -134,6 +151,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     public void put(String key, TreeData data) {
+        Check.notNull(key, data);
         try (Locker ignore = writeLock()) {
             InsertionResult result = findAndInsert(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key), data);
             if (result.requiresParentModification()) {
@@ -161,12 +179,14 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
     public boolean contains(String key) {
+        Check.notNull(key);
         try (Locker ignore = readLock()) {
             return find(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key)) != null;
         }
     }
 
     public long get(String key) {
+        Check.notNull(key);
         TreeEntry treeEntry;
         try (Locker ignore = readLock()) {
             treeEntry = find(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key));

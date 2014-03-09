@@ -2,17 +2,19 @@ package io.github.alexeygrishin.hashfile;
 
 import io.github.alexeygrishin.btree.KeyTruncateMethod;
 
+import java.io.PrintStream;
+
 public interface NameBasedStorageFactory {
     /**
      * Creates name based storage in specified file
      * @param filePath path to file where data will be stored. Shall not exist.
-     * @param blockSizeK block size in KBytes. Null means default value.
-     * @param cacheLimit cache limit in entries. Null means default value
+     * @param dataBlockSizeK data block size in KBytes (used to store data, shall be closer to average data size).  Null means default value.
+     * @param cacheSizeM cache size in MBytes. Null means default value
      * @param part how to truncate key. Null means default value
      * @return created storage
      * @throws CannotCreateStorage
      */
-    NamedStorage create(String filePath, Integer blockSizeK, Integer cacheLimit, KeyTruncateMethod part);
+    NamedStorage create(String filePath, Integer dataBlockSizeK, Integer cacheSizeM, KeyTruncateMethod part);
 
     /**
      * Same as {@link #create(String, Integer, Integer, io.github.alexeygrishin.btree.KeyTruncateMethod)} called with all
@@ -37,4 +39,12 @@ public interface NameBasedStorageFactory {
      * @throws CannotLoadStorage
      */
     void truncate(String filePath);
+
+    /**
+     * Gets storage meta information and prints to provided stream
+     * @param filePath
+     * @param out
+     * @throws CannotLoadStorage
+     */
+    void printInfo(String filePath, PrintStream out);
 }

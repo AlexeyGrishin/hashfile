@@ -12,7 +12,7 @@ public class CacheTest extends TestBaseWithCounter {
 
     @Before
     public void setup() {
-        allocator = new Cache(new BlockAllocator(counter, Struct.BLOCK_SIZE), 2);
+        allocator = new Cache(new BlockAllocator(counter, Struct_10Bytes.BLOCK_SIZE), 2* Struct_10Bytes.BLOCK_SIZE);
         block1 = allocator.allocate();
         block2 = allocator.allocate();
         block3 = allocator.allocate();
@@ -22,45 +22,45 @@ public class CacheTest extends TestBaseWithCounter {
 
     @Test
     public void subsequentRead() {
-        allocator.get(block1, Struct.class);
-        allocator.get(block2, Struct.class);
+        allocator.get(block1, Struct_10Bytes.class);
+        allocator.get(block2, Struct_10Bytes.class);
         assertReadsWrites(2, 0, 0);
         counter.resetCounters();
-        allocator.get(block1, Struct.class);
-        allocator.get(block2, Struct.class);
+        allocator.get(block1, Struct_10Bytes.class);
+        allocator.get(block2, Struct_10Bytes.class);
         assertReadsWrites(0, 0, 0);
     }
 
     @Test
     public void readNewBlockWithFullCache() {
-        allocator.get(block1, Struct.class);
-        allocator.get(block2, Struct.class);
+        allocator.get(block1, Struct_10Bytes.class);
+        allocator.get(block2, Struct_10Bytes.class);
         counter.resetCounters();
-        allocator.get(block3, Struct.class);
+        allocator.get(block3, Struct_10Bytes.class);
         assertReadsWrites(1, 0, 0);
     }
 
     @Test
     public void readNewBlockWithFullCache_lru() {
-        allocator.get(block1, Struct.class);
-        allocator.get(block2, Struct.class);
-        allocator.get(block1, Struct.class);
+        allocator.get(block1, Struct_10Bytes.class);
+        allocator.get(block2, Struct_10Bytes.class);
+        allocator.get(block1, Struct_10Bytes.class);
 
-        allocator.get(block3, Struct.class);
+        allocator.get(block3, Struct_10Bytes.class);
         counter.resetCounters();
         //block1 shall remain as recently used
-        allocator.get(block1, Struct.class);
+        allocator.get(block1, Struct_10Bytes.class);
         assertReadsWrites(0, 0, 0);
         counter.resetCounters();
         //block2 shall be loaded
-        allocator.get(block2, Struct.class);
+        allocator.get(block2, Struct_10Bytes.class);
         assertReadsWrites(1, 0, 0);
 
     }
 
     @Test
     public void subsequentWrites() {
-        Struct o = allocator.get(block1, Struct.class);
+        Struct_10Bytes o = allocator.get(block1, Struct_10Bytes.class);
         counter.resetCounters();
         allocator.saveModifications(block1, o);
         allocator.saveModifications(block1, o);
@@ -70,19 +70,19 @@ public class CacheTest extends TestBaseWithCounter {
 
     @Test
     public void subsequentWrites_fullCache() {
-        Struct o = allocator.get(block1, Struct.class);
+        Struct_10Bytes o = allocator.get(block1, Struct_10Bytes.class);
         allocator.saveModifications(block1, o);
         allocator.saveModifications(block1, o);
 
         counter.resetCounters();
-        allocator.get(block2, Struct.class);
-        allocator.get(block3, Struct.class);
+        allocator.get(block2, Struct_10Bytes.class);
+        allocator.get(block3, Struct_10Bytes.class);
         assertReadsWrites(2, 1, 0);
     }
 
     @Test
     public void writes_saveOnClose() {
-        Struct o = allocator.get(block1, Struct.class);
+        Struct_10Bytes o = allocator.get(block1, Struct_10Bytes.class);
         allocator.saveModifications(block1, o);
         counter.resetCounters();
 
