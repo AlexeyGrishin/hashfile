@@ -59,7 +59,7 @@ public class CommandLineAPI {
         }
     }
 
-    public void process(String args[], PrintStream out) throws ParseException, FileNotFoundException {
+    public void process(String args[], PrintStream out) throws ParseException, IOException {
         if (args.length == 0) {
             showHelp();
             return;
@@ -150,9 +150,11 @@ public class CommandLineAPI {
 
     }
 
-    private void importFile(PrintStream out, NamedStorage storage, String key, Source src) {
+    private void importFile(PrintStream out, NamedStorage storage, String key, Source src) throws IOException {
         out.print("Importing `" + key + "`...");
-        storage.saveFrom(key, src.openInputStream());
+        try (InputStream stream = src.openInputStream()) {
+            storage.saveFrom(key, stream);
+        }
         out.println("Ok!");
     }
 

@@ -52,51 +52,51 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void list() throws FileNotFoundException, ParseException {
+    public void list() throws Exception {
         when(storageMock.iterator()).thenReturn(Arrays.asList("a", "b").iterator());
         assertOutput(lines("a", "b"), "path1", "--list");
         verify(factory).load("path1");
     }
 
     @Test
-    public void empty() throws FileNotFoundException, ParseException {
+    public void empty() throws Exception {
         when(storageMock.iterator()).thenReturn(Arrays.<String>asList().iterator());
         assertOutput(lines("<Empty>"), "path1", "--list");
         verify(factory).load("path1");
     }
 
     @Test
-    public void create() throws FileNotFoundException, ParseException {
+    public void create() throws Exception {
         assertOutput(lines("Done"), "path1", "--new");
         verify(factory).create("path1", null, null, null);
     }
 
     @Test
-    public void create_blockSize() throws FileNotFoundException, ParseException {
+    public void create_blockSize() throws Exception {
         assertOutput(lines("Done"), "path1", "--new", "block=2");
         verify(factory).create("path1", 2, null, null);
     }
 
     @Test
-    public void create_cacheSize() throws FileNotFoundException, ParseException {
+    public void create_cacheSize() throws Exception {
         assertOutput(lines("Done"), "path1", "--new", "cache=2");
         verify(factory).create("path1", null, 2, null);
     }
 
     @Test
-    public void create_truncate_trailing() throws FileNotFoundException, ParseException {
+    public void create_truncate_trailing() throws Exception {
         assertOutput(lines("Done"), "path1", "--new", "cache=4,truncate=trailing");
         verify(factory).create("path1", null, 4, KeyTruncateMethod.TRAILING);
     }
 
     @Test
-    public void create_truncate_leading() throws FileNotFoundException, ParseException {
+    public void create_truncate_leading() throws Exception {
         assertOutput(lines("Done"), "path1", "--new", "cache=4,truncate=leading");
         verify(factory).create("path1", null, 4, KeyTruncateMethod.LEADING);
     }
 
     @Test
-    public void importFrom_withoutKey() throws FileNotFoundException, ParseException {
+    public void importFrom_withoutKey() throws Exception {
         processArgs("path1", "--import-from", "file1");
         verify(files).getSources("file1");
         verify(source1).openInputStream();
@@ -108,7 +108,7 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void importFrom_withKey() throws FileNotFoundException, ParseException {
+    public void importFrom_withKey() throws Exception {
         processArgs("path1", "--import-from", "file1", "--key", "key1");
         verify(files).getSources("file1");
         verify(source1).openInputStream();
@@ -119,7 +119,7 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void importFrom_folder_withoutKey() throws FileNotFoundException, ParseException {
+    public void importFrom_folder_withoutKey() throws Exception {
         when(files.getSources("folder1")).thenReturn(new Source[] {source1, source2});
         processArgs("path1", "--import-from", "folder1");
         verify(factory).load("path1");
@@ -135,13 +135,13 @@ public class CommandLineApiTest {
     }
 
     @Test(expected = InvalidSyntax.class)
-    public void importFrom_folder_withKey() throws FileNotFoundException, ParseException {
+    public void importFrom_folder_withKey() throws Exception{
         when(files.getSources("folder1")).thenReturn(new Source[] {source1, source2});
         processArgs("path1", "--import-from", "folder1", "--key", "key1");
     }
 
     @Test
-    public void exportTo() throws FileNotFoundException, ParseException {
+    public void exportTo() throws Exception {
         processArgs("path1", "--export-to", "file1", "--key", "key1");
         verify(files).getSources("file1");
         verify(source1).openOutputStream();
@@ -152,7 +152,7 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void check() throws FileNotFoundException, ParseException {
+    public void check() throws Exception {
         when(storageMock.contains("key1")).thenReturn(true);
         assertOutput(lines("Yes"), "path1", "--key", "key1", "--check");
         verify(factory).load("path1");
@@ -162,7 +162,7 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void delete() throws FileNotFoundException, ParseException {
+    public void delete() throws Exception {
         processArgs("path1", "--key", "key2", "--delete");
         verify(factory).load("path1");
         verify(storageMock).delete("key2");
@@ -171,7 +171,7 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void truncate_standalone() throws FileNotFoundException, ParseException {
+    public void truncate_standalone() throws Exception {
         processArgs("path1", "--optimize");
         verify(factory).load("path1");
         verify(factory).truncate("path1");
@@ -180,7 +180,7 @@ public class CommandLineApiTest {
     }
 
     @Test
-    public void truncate_delete() throws FileNotFoundException, ParseException {
+    public void truncate_delete() throws Exception {
         processArgs("path1", "--key", "key1", "--delete", "--optimize");
         verify(factory).load("path1");
         verify(storageMock).delete("key1");
@@ -210,17 +210,17 @@ public class CommandLineApiTest {
     }
 
     @Test(expected = InvalidSyntax.class)
-    public void new_truncateInvalid() throws FileNotFoundException, ParseException {
+    public void new_truncateInvalid() throws Exception {
         processArgs("path1", "--new", "truncate=leadin");
     }
 
-    private void assertOutput(String expectation, String... params) throws FileNotFoundException, ParseException {
+    private void assertOutput(String expectation, String... params) throws Exception {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         api.process(params, new PrintStream(stream));
         assertEquals(expectation, stream.toString());
     }
 
-    private void processArgs(String... params) throws FileNotFoundException, ParseException {
+    private void processArgs(String... params) throws Exception {
         api.process(params, toNull());
     }
 

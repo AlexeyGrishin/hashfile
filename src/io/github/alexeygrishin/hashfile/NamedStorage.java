@@ -10,7 +10,8 @@ import java.util.Iterator;
 public interface NamedStorage extends Iterable<String>, AutoCloseable {
 
     /**
-     * Gets data stored by specified key and puts it to the provided stream
+     * Gets data stored by specified key and puts it to the provided stream.
+     * Does not close given stream.
      * @param key data key
      * @param stream stream to process data
      * @return true if data was found, false otherwise
@@ -18,7 +19,8 @@ public interface NamedStorage extends Iterable<String>, AutoCloseable {
     boolean getInto(String key, OutputStream stream);
 
     /**
-     * Saves data from stream using provided key. If there was data for this key it will be overwritten with new data
+     * Saves data from stream using provided key. If there was data for this key it will be overwritten with new data.
+     * Does not close given stream.
      * @param key data key
      * @param stream stream to get data from
      */
