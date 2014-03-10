@@ -1,6 +1,5 @@
 package io.github.alexeygrishin;
 
-import io.github.alexeygrishin.blockalloc.Allocator;
 import io.github.alexeygrishin.blockalloc.BlockAllocator;
 import io.github.alexeygrishin.blockalloc.Cache;
 import io.github.alexeygrishin.btree.BTree;
@@ -14,12 +13,12 @@ import java.io.RandomAccessFile;
 import java.util.*;
 import static io.github.alexeygrishin.tool.TestTool.*;
 
-public class TreeMapPerformance {
+public class TreeMapRWPerformance {
 
 
     public static void main(String args[]) throws FileNotFoundException, InterruptedException {
-        TreeMapPerformance perf = new TreeMapPerformance();
-        PrintStream file = new PrintStream("btree_new_bin.csv");
+        TreeMapRWPerformance perf = new TreeMapRWPerformance();
+        PrintStream file = new PrintStream("btree_temp.csv");
         perf.doTest2(file);
         file.close();
     }
@@ -27,7 +26,7 @@ public class TreeMapPerformance {
     private Cache storage;
 
     private int[] blockSizes = {64*1024, 128*1024, 256*1024, 512*1024, 1024*1024};
-    private int[] cacheLimits = {1000, 10000, 100000, };
+    private int[] cacheSizes = {64*1024*1024,/*, 128*1024*1024,*/ 256*1024*1024};
 
     private int[] reverse(int[] array) {
         int[] newar = new int[array.length];
@@ -42,9 +41,9 @@ public class TreeMapPerformance {
     private void doTest2(PrintStream out) throws FileNotFoundException, InterruptedException {
 
         for (int blockSize: (blockSizes)) {
-            for (int cacheLimit: (cacheLimits)) {
-                System.out.println("test for " + blockSize + "x" + cacheLimit);
-                doTestTree(out, blockSize, cacheLimit, 100000, 20000, true);
+            for (int cacheSize: (cacheSizes)) {
+                System.out.println("test for " + blockSize + "x" + cacheSize);
+                doTestTree(out, blockSize, cacheSize, 1000000, 40000, true);
             }
         }
     }
@@ -70,10 +69,6 @@ public class TreeMapPerformance {
                 for (int i = 0; i < step; i++) {
                     String key = generatedKey + i + suffix;
                     lastStrings.add(key);
-                    if (step - i == putsCount) {
-                        now = now();
-                        ctr.resetCounters();
-                    }
                     tree.put(key, i);
                 }
                 if (!noreset)

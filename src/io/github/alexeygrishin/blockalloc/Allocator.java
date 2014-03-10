@@ -2,6 +2,7 @@ package io.github.alexeygrishin.blockalloc;
 
 /**
  * Operates with fixed-size blocks (in memory or on disk), handles their allocation, reusage and fragmentation.
+ * Access to different blocks is thread-safe. Access to the same block shall be guarded by the callers.
  */
 public interface Allocator {
 

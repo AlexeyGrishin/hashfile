@@ -43,7 +43,7 @@ public class NamedStorageIntegrationTest {
 
         @Test(timeout = TIMEOUT_4M)
         @Ignore
-        //TODO: replace with performance test
+        //This test is very long for automatic runs and its duration depends on end workstation
         public void add_4M_andIterate() {
             long now = System.nanoTime();
             for (long i = 0; i < HOW_MANY; i++) {

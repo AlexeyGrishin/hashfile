@@ -1,6 +1,7 @@
 package io.github.alexeygrishin.tool;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -26,6 +27,10 @@ public class TestTool {
 
     public static InputStream generateData(int len) {
         return new ByteGenerator(len);
+    }
+
+    public static OutputStream ignoreData() {
+        return new ByteCounter();
     }
 
 

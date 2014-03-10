@@ -4,7 +4,7 @@ import io.github.alexeygrishin.btree.KeyTruncateMethod;
 
 import java.io.PrintStream;
 
-public interface NameBasedStorageFactory {
+public interface NamedStorageFactory {
     /**
      * Creates name based storage in specified file
      * @param filePath path to file where data will be stored. Shall not exist.

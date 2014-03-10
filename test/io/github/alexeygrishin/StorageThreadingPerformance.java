@@ -1,29 +1,24 @@
 package io.github.alexeygrishin;
 
-import io.github.alexeygrishin.blockalloc.BlockAllocator;
-import io.github.alexeygrishin.blockalloc.Cache;
 import io.github.alexeygrishin.hashfile.NamedStorage;
 import io.github.alexeygrishin.hashfile.btreebased.BTreeBasedFactory;
-import io.github.alexeygrishin.hashfile.btreebased.BTreeBasedStorage;
 import io.github.alexeygrishin.tool.ByteCounter;
 import io.github.alexeygrishin.tool.TestTool;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class StoragePerformance {
+public class StorageThreadingPerformance {
 
     public static void main(String args[]) throws FileNotFoundException, InterruptedException {
-        StoragePerformance performance = new StoragePerformance();
-        performance.doTest(new PrintStream("perf_2.csv"));
+        StorageThreadingPerformance performance = new StorageThreadingPerformance();
+        performance.doTest(new PrintStream("perf_last.csv"));
     }
 
     private void doTest(PrintStream out) throws InterruptedException {
@@ -57,7 +52,7 @@ public class StoragePerformance {
         String hdr = "r=" + readers + " w=" + writers + "[" + keyLen + "/" + dataLen + "/" + randomData + "],";
         out.print(hdr);
         System.out.println(hdr);
-        final int opsCount = 10000;
+        final int opsCount = 100000;
         final int readOps = opsCount / readers;
         final int writeOps = opsCount / writers;
         final List<String> keys = TestTool.randomStrings(randomData, keyLen);

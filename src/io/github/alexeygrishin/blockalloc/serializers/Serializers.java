@@ -95,8 +95,11 @@ public class Serializers {
             else {
                 ser = new StructSerializer(kls, maxSize);
             }
-            sizedSerializers.put(key, ser);
         }
+        if (ser instanceof DynamicallySized) {
+            ((DynamicallySized)ser).setSize(maxSize);
+        }
+        sizedSerializers.put(key, ser);
         return ser;
     }
 

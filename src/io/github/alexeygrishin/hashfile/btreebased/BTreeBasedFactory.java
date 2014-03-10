@@ -14,10 +14,14 @@ import java.io.PrintStream;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 
-public class BTreeBasedFactory implements NameBasedStorageFactory {
+/**
+ * Produces B-tree named storage, defines defaults.
+ * Block size for B-tree is selected automatically to be >= 256K
+ */
+public class BTreeBasedFactory implements NamedStorageFactory {
 
     public static final int VERSION = 0x03;
-    public static final int DEFAULT_TREE_BLOCK_SIZE_KB = 1024;
+    public static final int DEFAULT_TREE_BLOCK_SIZE_KB = 256;
     public static final int DEFAULT_DATA_BLOCK_SIZE_KB = 4;
     public final static int DEFAULT_CACHE_SIZE_MB = 64;
     public static final int KB = 1024;
@@ -41,7 +45,7 @@ public class BTreeBasedFactory implements NameBasedStorageFactory {
 
     private BTreeBasedStorage createStorage(File file, int treeBlockSize, int dataBlockSize, Integer cacheSize, KeyTruncateMethod part) {
         try {
-            SynchronizedByteContainer container = new FileBytesContainer(FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.CREATE_NEW));
+            SynchronizedByteContainer container = createBytesContainer(file);
             MetaInformationWrapper wrapper = new MetaInformationWrapper(container);
             MetaInformationWrapper.MetaInfo info =  wrapper.getMetaInfo();
             info.version = VERSION;
@@ -58,6 +62,10 @@ public class BTreeBasedFactory implements NameBasedStorageFactory {
         } catch (IOException e) {
             throw new CannotCreateStorage(e);
         }
+    }
+
+    protected SynchronizedByteContainer createBytesContainer(File file) throws IOException {
+        return new FileBytesContainer(FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ, StandardOpenOption.CREATE_NEW));
     }
 
     private Allocator createTreeAllocator(MetaInformationWrapper.MetaInfo info, Cache dataAllocator) {

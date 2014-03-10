@@ -7,6 +7,8 @@ import java.io.OutputStream;
  * Container for user data storage.
  * Note that container does not check correctness of provided block indexes, calling it with non-data block index may lead
  * to unpredictable behavior.
+ *
+ * Thread-safe, operations on different data blocks could be performed concurrently.
  */
 public interface DataContainer {
 

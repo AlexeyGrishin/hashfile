@@ -15,7 +15,7 @@ public class ByteGenerator extends InputStream {
 
     @Override
     public int read() throws IOException {
-        return remaining-->0 ? TestTool.randomChar() : -1;
+        return remaining-->0 ? 'a' : -1;
     }
 
     public void reset() {

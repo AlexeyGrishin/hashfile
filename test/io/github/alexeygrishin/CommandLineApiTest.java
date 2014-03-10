@@ -3,16 +3,13 @@ package io.github.alexeygrishin;
 import io.github.alexeygrishin.btree.KeyTruncateMethod;
 import io.github.alexeygrishin.common.Files;
 import io.github.alexeygrishin.common.Source;
-import io.github.alexeygrishin.hashfile.NameBasedStorageFactory;
+import io.github.alexeygrishin.hashfile.NamedStorageFactory;
 import io.github.alexeygrishin.hashfile.NamedStorage;
 import org.apache.commons.cli.ParseException;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.mockito.internal.stubbing.answers.ReturnsArgumentAt;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
 
 import java.io.*;
 import java.util.Arrays;
@@ -27,7 +24,7 @@ public class CommandLineApiTest {
     @Mock
     private NamedStorage storageMock;
     @Mock
-    private NameBasedStorageFactory factory;
+    private NamedStorageFactory factory;
     @Mock
     private Files files;
     @Mock

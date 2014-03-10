@@ -28,9 +28,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Comparison is performed this way: first hashes are compared, then key parts and only then (if all identical) the whole key
  * is obtained from external storage.
  *
- * Search/Deletion/Insertion use binary search so these operations take ln(block_size)*ln(n).
- * Iteration takes n and order is not defined.
+ * Search/Deletion/Insertion use binary search so these operations take O(ln(block_size)*ln(n))
+ * Iteration takes O(n) and order is not defined.
  *
+ * Thread-safe, no concurrent access.
  */
 public class BTree implements Iterable<String>, AutoCloseable {
 
@@ -153,7 +154,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
     public void put(String key, TreeData data) {
         Check.notNull(key, data);
         try (Locker ignore = writeLock()) {
-            InsertionResult result = findAndInsert(firstPageBlockIdx, key, helper.truncate(key, KEY_PART_LENGTH), hash(key), data);
+            InsertionResult result = findAndInsert(firstPageBlockIdx, new TreeEntryKey(key, helper.truncate(key, KEY_PART_LENGTH), hash(key)), data);
             if (result.requiresParentModification()) {
                 try (BlockToModify<Page> newFirstPageBlock = allocator.allocateToModify(Page.class)) {
                     PageInfo pageInfo = newFirstPageBlock.getBlock().pageInfo;
@@ -413,11 +414,11 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
 
-    private InsertionResult findAndInsert(int page, String key, String truncatedKey, int hash, TreeData data) {
+    private InsertionResult findAndInsert(int page, TreeEntryKey key, TreeData data) {
         Page pageStruct = allocator.get(page, Page.class);
         PageInfo pageInfo = pageStruct.pageInfo;
         int count = pageInfo.countOfEntries;
-        int pos = Arrays.binarySearch(pageStruct.entries, 0, count, new TreeEntryKey(key, truncatedKey, hash), TREE_ENTRY_COMPARATOR);
+        int pos = Arrays.binarySearch(pageStruct.entries, 0, count, key, TREE_ENTRY_COMPARATOR);
         if (pos >= 0) {
             TreeEntry entry = pageStruct.entries[pos];
             entry.data = data.updateData(entry.data);
@@ -430,7 +431,7 @@ public class BTree implements Iterable<String>, AutoCloseable {
             boolean isLast = insertionPoint == count;
             int nextPage = isLast ? pageInfo.lastChildPtr : pageStruct.entries[insertionPoint].childPtr;
 
-            InsertionResult result = insertHereOrChild(page, pageStruct, key, truncatedKey, hash, data, nextPage, insertionPoint, count);
+            InsertionResult result = insertHereOrChild(page, pageStruct, key, data, nextPage, insertionPoint, count);
             if (result.requiresParentModification()) {
                 if (isLast) {
                     pageInfo.lastChildPtr = result.newBlockId;
@@ -464,20 +465,18 @@ public class BTree implements Iterable<String>, AutoCloseable {
         return result;
     }
 
-    private InsertionResult insertHereOrChild(int page, Page pageStruct, String key, String truncatedKey, int hash, TreeData data, int nextPage, int index, int count) {
+    private InsertionResult insertHereOrChild(int page, Page pageStruct, TreeEntryKey key, TreeData data, int nextPage, int index, int count) {
         InsertionResult result = InsertionResult.DONE;
         if (Pointer.isValidNext(nextPage)) {
-            result = findAndInsert(nextPage, key, truncatedKey, hash, data);
+            result = findAndInsert(nextPage, key, data);
             if (result.requiresParentModification()) {
-                //TODO: use TreeEntryKey struct instead of this...
-                //TODO: count increment --> insertBefore
-                insertBefore(pageStruct, index, getWholeKey(result.middlePointForParent), result.middlePointForParent.keyPart, result.middlePointForParent.hash, result.middlePointForParent.data, count, result.oldBlockId);
+                insertBefore(pageStruct, index, new TreeEntryKey(getWholeKey(result.middlePointForParent), result.middlePointForParent.keyPart, result.middlePointForParent.hash), result.middlePointForParent.data, count, result.oldBlockId);
                 pageStruct.pageInfo.countOfEntries++;
                 allocator.saveModifications(page, pageStruct);
             }
         }
         else {
-            insertBefore(pageStruct, index, key, truncatedKey, hash, data.createData(), count, Pointer.NULL_PTR);
+            insertBefore(pageStruct, index, key, data.createData(), count, Pointer.NULL_PTR);
             pageStruct.pageInfo.countOfEntries++;
             modCount++;
             totalCount++;
@@ -491,11 +490,11 @@ public class BTree implements Iterable<String>, AutoCloseable {
     }
 
 
-    private void insertBefore(Page pageStruct, int index, String key, String truncatedKey, int hash, long data, int count, int childPtr) {
+    private void insertBefore(Page pageStruct, int index, TreeEntryKey key, long data, int count, int childPtr) {
         if (index < count) {
             System.arraycopy(pageStruct.entries, index, pageStruct.entries, index + 1, count - index);
         }
-        pageStruct.entries[index] = new TreeEntry(key, hash, data, helper, childPtr);
+        pageStruct.entries[index] = new TreeEntry(key.fullKey, key.hash, data, helper, childPtr);
     }
 
     private int compare(int hash, String truncatedKey, String key, TreeEntry entry) {

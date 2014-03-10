@@ -4,8 +4,8 @@ import io.github.alexeygrishin.btree.KeyTruncateMethod;
 import io.github.alexeygrishin.common.Files;
 import io.github.alexeygrishin.common.RealFiles;
 import io.github.alexeygrishin.common.Source;
+import io.github.alexeygrishin.hashfile.NamedStorageFactory;
 import io.github.alexeygrishin.hashfile.btreebased.BTreeBasedFactory;
-import io.github.alexeygrishin.hashfile.NameBasedStorageFactory;
 import io.github.alexeygrishin.hashfile.NamedStorage;
 import org.apache.commons.cli.*;
 
@@ -14,13 +14,13 @@ import java.io.*;
 
 public class CommandLineAPI {
 
-    private NameBasedStorageFactory factory;
+    private NamedStorageFactory factory;
     private Files files;
     private CommandLineParser parser = new BasicParser();
     private Options options = new Options();
     private String header = "", footer = "";
 
-    public CommandLineAPI(NameBasedStorageFactory factory, Files files) throws IOException {
+    public CommandLineAPI(NamedStorageFactory factory, Files files) throws IOException {
         this.factory = factory;
         this.files = files;
         options.addOption("l", "list", false, "Shows all keys");

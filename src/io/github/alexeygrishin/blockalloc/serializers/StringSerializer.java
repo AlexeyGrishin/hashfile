@@ -2,7 +2,7 @@ package io.github.alexeygrishin.blockalloc.serializers;
 
 import java.nio.ByteBuffer;
 
-class StringSerializer implements Serializer<String> {
+public class StringSerializer implements Serializer<String> {
     private int maxSize;
     private int maxLength;
 
