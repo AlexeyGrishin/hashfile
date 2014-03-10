@@ -67,16 +67,10 @@ public class BTree implements Iterable<String>, AutoCloseable {
         int size = Serializers.INSTANCE.getSize(TreeEntry.class);
         int pageInfoSize = Serializers.INSTANCE.getSize(PageInfo.class);
         int sizeForEntries = allocator.getBlockSize() - pageInfoSize;
-        if (sizeForEntries % size != 0) {
-            throw new IllegalArgumentException("Block shall contain integer amount of entries (entry size = " + size + ", block size = " + allocator.getBlockSize());
-        }
+        Check.arguments(sizeForEntries % size == 0, "Block shall contain integer amount of entries (entry size = " + size + ", block size = " + allocator.getBlockSize());
         maxAmount = sizeForEntries / size;
-        if (maxAmount % 2 != 1) {
-            throw new IllegalArgumentException("Block shall contain even nmber of entries (now " + maxAmount + ")");
-        }
-        if (maxAmount < 3) {
-            throw new IllegalArgumentException("Block shall have at least " + (size*3 + pageInfoSize) + ": " + (size * 3) + "bytes (data) + " + pageInfoSize + " bytes (meta)");
-        }
+        Check.arguments(maxAmount % 2 == 1, "Block shall contain even nmber of entries (now " + maxAmount + ")");
+        Check.arguments(maxAmount >= 3, "Block shall have at least " + (size*3 + pageInfoSize) + ": " + (size * 3) + "bytes (data) + " + pageInfoSize + " bytes (meta)");
         t = (maxAmount+1) / 2;
         minAmount = t - 1;
         maxAmount = 2*t - 1;

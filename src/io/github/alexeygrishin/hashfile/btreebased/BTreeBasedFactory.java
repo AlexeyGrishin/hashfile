@@ -55,6 +55,10 @@ public class BTreeBasedFactory implements NamedStorageFactory {
             info.cacheSize = cacheSize;
             wrapper.setMetaInfo(info);
 
+            //TODO[performance]: now same cache is used for both tree and data blocks. It means that data blocks may
+            //shift out the tree blocks from cache even the data block is used only once. Probably it would be better
+            //to have separate caches or do not have cache for data blocks at all - I think access to the same data blocks
+            //will be rare
             BlockAllocator allocator = new BlockAllocator(wrapper, dataBlockSize);
             Cache cache = new Cache(allocator, cacheSize);
             Allocator treeAllocator = createTreeAllocator(info, cache);

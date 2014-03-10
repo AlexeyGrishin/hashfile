@@ -12,8 +12,8 @@ import java.util.List;
  */
 class StructSerializer<T> implements Serializer<T> {
 
-    private Class<T> kls;
-    private List<FieldInfo> fields = new ArrayList<>(16);
+    private final Class<T> kls;
+    private final List<FieldInfo> fields = new ArrayList<>(16);
     private int size;
     private int pad = 0;
 

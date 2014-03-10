@@ -1,6 +1,7 @@
 package io.github.alexeygrishin.blockalloc;
 
 import io.github.alexeygrishin.common.CacheBase;
+import io.github.alexeygrishin.common.Check;
 
 import static io.github.alexeygrishin.common.Check.safeInt;
 
@@ -15,6 +16,8 @@ public class Cache implements RandomAccessAllocator {
 
     public Cache(final RandomAccessAllocator inner, final long maxCacheSize) {
         this.inner = inner;
+        Check.positive(maxCacheSize, "maxCacheSize");
+        Check.arguments(maxCacheSize > inner.getBlockSize(), "cache size shall be larger than block size");
         this.cache = new CacheBase<CacheKey, CacheEntry>(maxCacheSize, safeInt(maxCacheSize / inner.getBlockSize())) {
 
             @Override

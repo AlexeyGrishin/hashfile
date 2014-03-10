@@ -1,5 +1,8 @@
 package io.github.alexeygrishin.btree;
 
+/**
+ * Provides different methods of key truncation
+ */
 public class Truncate {
 
     public static String leading(String str, int maxLen) {

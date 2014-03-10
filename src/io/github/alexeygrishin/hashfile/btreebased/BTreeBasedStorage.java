@@ -22,8 +22,8 @@ public class BTreeBasedStorage implements NamedStorage {
 
     public static final int NAMES_CACHE_SIZE = 1024 * 1024;
     public static final int NAMES_CACHE_INITIAL_COUNT = 1024;
-    private BTree tree;
-    private DataStorage storage;
+    private final BTree tree;
+    private final DataStorage storage;
 
     /**
      * Creates storage

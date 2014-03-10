@@ -33,7 +33,7 @@ public interface Allocator {
      * Saves object to the block with specified id.
      * @param blockId block id, >=0 and < getBlocksCount()
      * @param data object to store
-     * @throws java.lang.IndexOutOfBoundsException if trying to write outsie storage
+     * @throws java.lang.IndexOutOfBoundsException if trying to write outside storage
      * @throws io.github.alexeygrishin.blockalloc.serializers.SerializationException if cannot convert object to bytes
      **/
     void saveModifications(int blockId, Object data);

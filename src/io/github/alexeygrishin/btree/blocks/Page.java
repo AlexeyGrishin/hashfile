@@ -9,7 +9,7 @@ import io.github.alexeygrishin.common.Pointer;
 
 import java.nio.ByteBuffer;
 
-//Manual serialization for better performance
+
 public class Page implements Serializer<Page>, DynamicallySized {
     public PageInfo pageInfo;
     public TreeEntry[] entries;
@@ -48,6 +48,7 @@ public class Page implements Serializer<Page>, DynamicallySized {
     }
 
     @Override
+    //Manual serialization for better performance
     public void save(ByteBuffer buffer, Page instance) {
         buffer.putInt(instance.pageInfo.countOfEntries);
         buffer.putInt(instance.pageInfo.lastChildPtr);
@@ -72,6 +73,8 @@ public class Page implements Serializer<Page>, DynamicallySized {
         page.pageInfo.lastChildPtr = buffer.getInt();
         StringSerializer ser = new StringSerializer(BTree.KEY_PART_SIZE);
         page.entries = new TreeEntry[entriesMaxCount];
+        //TODO[performance]: as BTree uses binary search for most of operations there is no need to
+        //deserialize all TreeEntries. They could be unserialized lazily by request.
         for (int i = 0; i < page.pageInfo.countOfEntries; i++) {
             buffer.position(BTree.ENTRY_SIZE * i + BTree.ENTRY_SIZE);
             TreeEntry entry = new TreeEntry();

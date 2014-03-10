@@ -11,7 +11,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
-public class DataStorage implements DataContainer{
+public class DataStorage implements DataContainer {
 
     private Allocator allocator;
     private LockMap<Integer> pageLocker = new LockMap<>();
@@ -70,7 +70,7 @@ public class DataStorage implements DataContainer{
 
     @Override
     public int insert(String fullName, InputStream stream) {
-        byte[] nameInBytes = fullName.getBytes();
+        byte[] nameInBytes = fullName.getBytes(StandardCharsets.UTF_8);
         int createdBlockId = Pointer.NULL_PTR;
         try {   //no need for lock here - allocator shall be thread-safe for adding
             BlockToModify<DataPage> firstBlock = allocator.allocateToModify(DataPage.class);
